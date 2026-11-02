@@ -592,6 +592,18 @@ body.touch-mode #touch-interact-button.visible {
   box-shadow: 0 0 18px rgba(122, 252, 138, 0.42);
 }
 
+#poison-status {
+  margin-top: 7px;
+  color: #d7ed79;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 9px rgba(171, 206, 57, 0.55);
+}
+#poison-status[hidden] {
+  display: none;
+}
+
 #ui-top #score {
   position: fixed;
   top: 16px;

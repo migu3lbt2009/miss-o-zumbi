@@ -21,7 +21,7 @@ let rockTexture = null;
 let bushTexture = null;
 let fireTexture = null;
 const pickupTextures = { pistol: null, shotgun: null, shotgun12: null, rifle: null, smg: null, grenadeLauncher: null, medkit: null, scrap: null, greatsword: null };
-const enemyTextures = { walker: null, rusher: null, dodger: null, tank: null, bloater: null, jumper: null, mimic: null, boss: null, entity: null, parasiteBoss: null, parasite: null, infectedParasite: null, necromancer: null, necromancerBoss: null, skeleton: null, wolf: null, werewolf: null, wolf_minion: null, shooter: null, npc: null };
+const enemyTextures = { walker: null, rusher: null, dodger: null, tank: null, bloater: null, fungus: null, jumper: null, mimic: null, boss: null, rootBoss: null, entity: null, parasiteBoss: null, parasite: null, infectedParasite: null, necromancer: null, necromancerBoss: null, skeleton: null, wolf: null, werewolf: null, wolf_minion: null, shooter: null, npc: null };
 let necromancerProjectileTexture = null;
 const localForestTextures = {
   walker: 'fotos/zumbis/zumbi-normal.png',
@@ -29,10 +29,12 @@ const localForestTextures = {
   dodger: 'fotos/zumbis/zumbi-esperto.png',
   tank: 'fotos/zumbis/zumbi-tank.png',
   bloater: 'fotos/zumbis/zumbi-explode.png',
+  fungus: 'fotos/zumbis/Abominação Fúngica Pixelada.png',
   jumper: 'fotos/zumbis/zumbi que pula.png',
   mimic: 'fotos/chefes/mini chefe Mimic.webp',
   shooter: 'fotos/zumbis/zumbi-acido_atirador.png',
   boss: 'fotos/chefes/chefe-textura.png',
+  rootBoss: 'fotos/chefes/Demônio Raiz com Olhos Incandescentes.png',
   entity: 'fotos/chefes/Demônio de Fumaça Carmesim.png',
   parasiteBoss: 'fotos/chefes/boss parasita.png',
   electrician: 'fotos/chefes/boss eletrico.png',
@@ -378,6 +380,9 @@ let gameStarted = false;
 let settingsOpenedFromMenu = false;
 let playerHealth = STARTING_PLAYER_HEALTH;
 let maxPlayerHealth = STARTING_PLAYER_HEALTH;
+let poisonDuration = 0;
+let poisonDamageTimer = 0;
+let poisonExposure = 0;
 let currentWave = 1;
 let enemiesThisWave = 0;
 let enemiesToSpawnThisWave = 0;
@@ -409,6 +414,7 @@ const gameoverBestElement = document.getElementById('gameover-best');
 const damageVignetteElement = document.getElementById('damage-vignette');
 const healVignetteElement = document.getElementById('heal-vignette');
 const damageSoundElement = document.getElementById('damage-sound');
+const poisonStatusElement = document.getElementById('poison-status');
 let damageEffectUntil = 0;
 let damageEffectTimer = null;
 let lastDamageFeedbackAt = -Infinity;
@@ -1899,7 +1905,7 @@ function updateShopButtons() {
   const lifestealPrice = SHOP_PRICES.lifesteal + lifestealLevel * 30;
   if (buyLifeButton) {
     buyLifeButton.textContent = `Comprar (${SHOP_PRICES.heal} sucata)`;
-    buyLifeButton.disabled = scrap < SHOP_PRICES.heal || playerHealth >= maxPlayerHealth;
+    buyLifeButton.disabled = scrap < SHOP_PRICES.heal || (playerHealth >= maxPlayerHealth && poisonDuration <= 0);
   }
   if (buyVestButton) {
     buyVestButton.textContent = `Comprar (${vestPrice} sucata)`;
@@ -1925,8 +1931,15 @@ buyShotgun12Button?.addEventListener('click', () => { buyWeapon('shotgun12'); pl
 buySmgButton?.addEventListener('click', () => { buyWeapon('smg'); playOneShot(localGameSounds.purchase, 0.9); });
 buyRifleButton?.addEventListener('click', () => { buyWeapon('rifle'); playOneShot(localGameSounds.purchase, 0.9); });
 buyLifeButton?.addEventListener('click', () => {
-  if (scrap < SHOP_PRICES.heal || playerHealth >= maxPlayerHealth) return;
-  scrap -= SHOP_PRICES.heal; playerHealth = Math.min(maxPlayerHealth, playerHealth + 3); playOneShot(localGameSounds.purchase, 0.9); updateHealthDisplay(); updateScrapDisplay(); updateShopButtons();
+  if (scrap < SHOP_PRICES.heal || (playerHealth >= maxPlayerHealth && poisonDuration <= 0)) return;
+  scrap -= SHOP_PRICES.heal;
+  playerHealth = Math.min(maxPlayerHealth, playerHealth + 3);
+  const curedPoison = clearPoison();
+  playOneShot(localGameSounds.purchase, 0.9);
+  updateHealthDisplay();
+  updateScrapDisplay();
+  updateShopButtons();
+  if (curedPoison) showGameNotification('Kit médico: veneno removido e vida recuperada.', 'reward');
 });
 buyVestButton?.addEventListener('click', () => {
   const price = SHOP_PRICES.vest + vestLevel * 15;
@@ -2043,13 +2056,15 @@ function playSound(frequency, duration = 0.08) {
 }
 
 /* ---------- Inimigos ---------- */
-const enemyColors = { walker: 0x4f2d2d, rusher: 0x7a0909, dodger: 0x31402d, tank: 0x2d392d, bloater: 0x8f4b20, jumper: 0xa8572c, boss: 0x8b0000, entity: 0x1d1b2a, shooter: 0x3a3a3a };
-const bossEnemyTypes = new Set(['boss', 'wolf', 'necromancer', 'parasiteBoss', 'electrician', 'entity']);
+const enemyColors = { walker: 0x4f2d2d, rusher: 0x7a0909, dodger: 0x31402d, tank: 0x2d392d, bloater: 0x8f4b20, fungus: 0x667833, jumper: 0xa8572c, boss: 0x8b0000, entity: 0x1d1b2a, shooter: 0x3a3a3a };
+const bossEnemyTypes = new Set(['boss', 'wolf', 'necromancer', 'parasiteBoss', 'electrician', 'entity', 'rootBoss']);
 const enemyTypes = ['walker', 'walker', 'walker', 'rusher', 'dodger', 'tank', 'shooter', 'bloater'];
 const bullets = [];
 const grenadeProjectiles = [];
 const enemies = [];
 const pickups = [];
+const sporeClouds = [];
+const rootHazards = [];
 const muzzleFlashes = [];
 const enemyProjectiles = [];
 const acidPuddles = [];
@@ -2128,6 +2143,7 @@ function createEnemyMesh(type) {
     if (type === 'mimic') sprite.scale.set(3.8, 4.4, 1);
     else if (type === 'tank') sprite.scale.set(3.6, 4.8, 1);
     else if (type === 'boss') sprite.scale.set(4.4, 5.5, 1);
+    else if (type === 'rootBoss') sprite.scale.set(4.8, 5.7, 1);
     else if (type === 'entity') sprite.scale.set(4.8, 5.8, 1);
     else if (type === 'parasiteBoss') sprite.scale.set(4.6, 5.2, 1);
     else if (type === 'electrician') sprite.scale.set(3.8, 5.0, 1);
@@ -2160,7 +2176,7 @@ function createEnemyMesh(type) {
 function getEnemyGroundY(type) {
   // O chão fica em Y=-1.5. O Y abaixo compensa metade da altura do sprite,
   // deixando os inimigos realmente apoiados no chão em vez de parecerem flutuar.
-  if (type === 'boss') return 1.25;
+  if (type === 'boss' || type === 'rootBoss') return 1.25;
   if (type === 'entity') return 1.35;
   if (type === 'parasiteBoss') return 1.15;
   if (type === 'electrician') return 1.0;
@@ -2229,6 +2245,7 @@ function spawnEnemy(forceType = null, nearPosition = null, spawnOptions = {}) {
   // Velocidade: tanque é bem mais lento; corredor é bem mais rápido; esperto é ágil; boss é pesado; lobo é muito rápido.
   const baseSpeed = enemySpeed * (
     type === 'rusher' ? 1.3 :
+    type === 'fungus' ? 0.82 :
     type === 'mimic' ? 0.8 :
     type === 'tank' ? 0.42 :
     type === 'boss' ? 0.5 :
@@ -2247,6 +2264,7 @@ function spawnEnemy(forceType = null, nearPosition = null, spawnOptions = {}) {
   const baseHealthByType =
     type === 'mimic' ? 240 :
     type === 'boss' ? 75 + currentWave * 5 :
+    type === 'rootBoss' ? 220 + currentWave * 6 :
     type === 'entity' ? 210 + currentWave * 8 :
     type === 'parasiteBoss' ? 240 + currentWave * 5 :
     type === 'electrician' ? 190 + currentWave * 5 :
@@ -2257,6 +2275,7 @@ function spawnEnemy(forceType = null, nearPosition = null, spawnOptions = {}) {
     type === 'jumper' ? 30 + currentWave * 3 :
     type === 'shooter' ? 10 + Math.floor(currentWave / 4) :
     type === 'bloater' ? 16 + currentWave * 1.8 :
+    type === 'fungus' ? Math.floor(Math.random() * 4) + 11 :
     type === 'tank' ? Math.floor(Math.random() * 25) + 30 :  // 25 a 30 — bem tanque
     type === 'rusher' ? Math.floor(Math.random() * 10) + 15 : // 10 a 15 — acima do normal
     type === 'dodger' ? Math.floor(Math.random() * 6) + 10 : // 4 a 10
@@ -2849,10 +2868,12 @@ function collectPickup(kind, pickup = null) {
   if (kind === 'medkit') {
     const previousHealth = playerHealth;
     playerHealth = Math.min(maxPlayerHealth, playerHealth + 2);
+    const curedPoison = clearPoison();
     updateHealthDisplay();
     showHealEffect();
     const healed = Math.round(playerHealth - previousHealth);
-    showGameNotification(healed > 0 ? `+${healed} vida (kit médico)` : 'Vida já está cheia', healed > 0 ? 'reward' : 'info');
+    const healingMessage = healed > 0 ? `+${healed} vida (kit médico)` : 'Vida já está cheia';
+    showGameNotification(curedPoison ? `${healingMessage} · veneno removido` : healingMessage, healed > 0 || curedPoison ? 'reward' : 'info');
   } else if (kind === 'scrap') {
     const amount = pickup?.userData.value || 0;
     scrap += amount;
@@ -2938,6 +2959,23 @@ function updateHealthDisplay() {
   }
 }
 
+function updatePoisonStatus() {
+  if (!poisonStatusElement) return;
+  poisonStatusElement.hidden = poisonDuration <= 0;
+  if (poisonDuration > 0) {
+    poisonStatusElement.textContent = `ENVENENADO · ${Math.ceil(poisonDuration)}s · kit médico cura`;
+  }
+}
+
+function clearPoison() {
+  const wasPoisoned = poisonDuration > 0;
+  poisonDuration = 0;
+  poisonDamageTimer = 0;
+  poisonExposure = 0;
+  updatePoisonStatus();
+  return wasPoisoned;
+}
+
 function getRegularEnemiesForWave(wave) {
   const extraAfterWave10 = Math.floor(Math.max(0, wave - 10) / 2);
   const baseCount = Math.min(wave + 2 + extraAfterWave10, 100);
@@ -2970,15 +3008,23 @@ function getWaveSpawnInterval(wave) {
 function getWaveEnemyType(wave) {
   const postWavePressure = Math.max(0, wave - 15);
   const weights = [
-    ['walker', Math.max(1, 12 - wave * 0.55)],
-    ['wolf_minion', wave >= 9 ? Math.min(3.5, 1.1 + postWavePressure * 0.08) : 0],
-    ['dodger', wave >= 3 ? Math.max(1, 5 - wave * 0.08) + postWavePressure * 0.045 : 0],
-    ['rusher', wave >= 5 ? Math.max(1, 5 - wave * 0.07) + postWavePressure * 0.05 : 0],
-    ['tank', wave >= 7 ? Math.max(1, 4.5 - wave * 0.05) + postWavePressure * 0.07 : 0],
-    ['shooter', wave >= 10 ? Math.max(1, 4.5 - wave * 0.04) + postWavePressure * 0.075 : 0],
-    ['bloater', wave >= 10 ? Math.max(1, 3.5 - wave * 0.03) + postWavePressure * 0.05 : 0],
+    ['walker', 1, Math.max(1, 12 - wave * 0.55)],
+    ['dodger', 3, Math.max(1, 5 - wave * 0.08) + postWavePressure * 0.045],
+    ['rusher', 6, Math.max(1, 5 - wave * 0.07) + postWavePressure * 0.05],
+    ['tank', 9, Math.max(1, 4.5 - wave * 0.05) + postWavePressure * 0.07],
+    ['shooter', 12, Math.max(1, 4.5 - wave * 0.04) + postWavePressure * 0.075],
+    ['bloater', 15, Math.max(1, 3.5 - wave * 0.03) + postWavePressure * 0.05],
+    ['fungus', 18, 2.2 + postWavePressure * 0.04],
+    ['jumper', 21, 2.5 + postWavePressure * 0.05],
+    ['wolf_minion', 24, Math.min(3.5, 1.1 + postWavePressure * 0.08)],
   ];
-  const available = weights.filter(([, weight]) => weight > 0);
+  const available = weights
+    .filter(([, unlockWave]) => wave >= unlockWave)
+    .map(([type, unlockWave, baseWeight]) => {
+      if (type === 'walker') return [type, baseWeight];
+      const unlockRamp = Math.min(1, 0.25 + (wave - unlockWave) * 0.25);
+      return [type, baseWeight * unlockRamp];
+    });
   const totalWeight = available.reduce((total, [, weight]) => total + weight, 0);
   let roll = Math.random() * totalWeight;
   for (const [type, weight] of available) {
@@ -3003,8 +3049,8 @@ function showForestWaveBanner(title, subtitle) {
   }, 2600);
 }
 
-const randomizedBossTypes = ['wolf', 'necromancer', 'parasiteBoss', 'electrician', 'entity'];
-const bossNames = { boss: 'Chefe Brutamontes', necromancer: 'Necromante', wolf: 'Lobo Infernal', parasiteBoss: 'O Hospedeiro', electrician: 'Eletricista', entity: 'Demônio da Fumaça', mimic: 'Mimic' };
+const randomizedBossTypes = ['wolf', 'necromancer', 'parasiteBoss', 'electrician', 'entity', 'rootBoss'];
+const bossNames = { boss: 'Chefe Brutamontes', necromancer: 'Necromante', wolf: 'Lobo Infernal', parasiteBoss: 'O Hospedeiro', electrician: 'Eletricista', entity: 'Demônio da Fumaça', rootBoss: 'O Jardineiro', mimic: 'Mimic' };
 function updateBossHealthDisplay() {
   const boss = enemies.find((enemy) =>
     enemy.userData.alive && (bossEnemyTypes.has(enemy.userData.type) || enemy.userData.type === 'mimic')
@@ -3310,7 +3356,8 @@ function applyDamageToEnemy(enemy, index, damage, headshot = false) {
       spawnAcidDeathSplash(deathPosition);
       spawnAcidPuddle(deathPosition);
     }
-    score += deathType === 'mimic' ? 90 : deathType === 'boss' || deathType === 'parasiteBoss' || deathType === 'electrician' ? 100 : deathType === 'jumper' ? 18 : deathType === 'tank' ? 20 : 10;
+    if (deathType === 'fungus') spawnSporeCloud(deathPosition);
+    score += deathType === 'mimic' ? 90 : deathType === 'boss' || deathType === 'rootBoss' || deathType === 'parasiteBoss' || deathType === 'electrician' ? 100 : deathType === 'jumper' ? 18 : deathType === 'tank' ? 20 : 10;
     if (questAccepted && !questDone) {
       questKills++;
       if (QUEST_ELITE_TYPES.has(deathType)) questEliteKills++;
@@ -3329,7 +3376,7 @@ function applyDamageToEnemy(enemy, index, damage, headshot = false) {
       deathType === 'tank' ? randomInt(4, 8) :
       deathType === 'jumper' ? randomInt(3, 5) :
       deathType === 'boss' ? 12 + getBossRank(currentWave) * 4 :
-      deathType === 'parasiteBoss' || deathType === 'electrician' || deathType === 'necromancer' ? 25 + getBossRank(currentWave) * 5 :
+      deathType === 'rootBoss' || deathType === 'parasiteBoss' || deathType === 'electrician' || deathType === 'necromancer' ? 25 + getBossRank(currentWave) * 5 :
       deathType === 'wolf' ? 18 + getBossRank(currentWave) * 4 :
       deathType === 'wolf_minion' ? 5 :
       2;
@@ -4473,6 +4520,198 @@ function updateGrenadeProjectiles(delta) {
   }
 }
 
+function spawnSporeCloud(position) {
+  const cloud = new THREE.Group();
+  const groundHaze = new THREE.Mesh(
+    new THREE.CircleGeometry(3.2, 36),
+    new THREE.MeshBasicMaterial({ color: 0x7f9b36, transparent: true, opacity: 0.42, depthWrite: false })
+  );
+  groundHaze.rotation.x = -Math.PI / 2;
+  groundHaze.position.y = -1.4;
+  cloud.add(groundHaze);
+
+  const wisps = [];
+  for (let i = 0; i < 9; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 2.2;
+    const wisp = new THREE.Mesh(
+      new THREE.SphereGeometry(0.55 + Math.random() * 0.45, 10, 8),
+      new THREE.MeshBasicMaterial({
+        color: i % 2 ? 0x91a942 : 0x65772b,
+        transparent: true,
+        opacity: 0.3,
+        depthWrite: false
+      })
+    );
+    wisp.position.set(Math.cos(angle) * distance, -0.45 + Math.random() * 0.9, Math.sin(angle) * distance);
+    wisp.userData.baseY = wisp.position.y;
+    wisp.userData.phase = Math.random() * Math.PI * 2;
+    cloud.add(wisp);
+    wisps.push(wisp);
+  }
+
+  cloud.position.set(position.x, 0, position.z);
+  cloud.userData = { life: 5, age: 0, radius: 3.2, groundHaze, wisps };
+  scene.add(cloud);
+  sporeClouds.push(cloud);
+}
+
+function updateSporeClouds(delta) {
+  let insideSpores = false;
+  for (let i = sporeClouds.length - 1; i >= 0; i--) {
+    const cloud = sporeClouds[i];
+    cloud.userData.life -= delta;
+    cloud.userData.age += delta;
+    const fade = Math.min(1, cloud.userData.life / 0.8);
+    const pulse = 1 + Math.sin(clock.elapsedTime * 3.5 + i) * 0.05;
+    cloud.userData.groundHaze.material.opacity = fade * 0.42;
+    cloud.userData.groundHaze.scale.setScalar(pulse);
+    for (const wisp of cloud.userData.wisps) {
+      wisp.position.y = wisp.userData.baseY + Math.sin(clock.elapsedTime * 1.8 + wisp.userData.phase) * 0.12;
+      wisp.material.opacity = fade * 0.3;
+    }
+
+    const dx = player.position.x - cloud.position.x;
+    const dz = player.position.z - cloud.position.z;
+    if (dx * dx + dz * dz <= cloud.userData.radius * cloud.userData.radius) insideSpores = true;
+
+    if (cloud.userData.life <= 0) {
+      scene.remove(cloud);
+      cloud.traverse((part) => {
+        if (part.geometry) part.geometry.dispose();
+        if (part.material) part.material.dispose();
+      });
+      sporeClouds.splice(i, 1);
+    }
+  }
+
+  if (poisonDuration <= 0) {
+    poisonExposure = insideSpores ? poisonExposure + delta : 0;
+    if (poisonExposure >= 1.8) {
+      poisonDuration = 15;
+      poisonDamageTimer = 5;
+      poisonExposure = 0;
+      updatePoisonStatus();
+      showGameNotification('Esporos inalados: envenenado! Saia da nuvem.', 'damage');
+    }
+  }
+
+  if (poisonDuration > 0) {
+    poisonDamageTimer -= delta;
+    while (poisonDamageTimer <= 0 && poisonDuration > 0) {
+      damagePlayer(1);
+      poisonDamageTimer += 5;
+    }
+    poisonDuration = Math.max(0, poisonDuration - delta);
+    if (poisonDuration <= 0) {
+      poisonDamageTimer = 0;
+      updatePoisonStatus();
+      showGameNotification('O efeito do veneno passou.', 'info');
+    } else {
+      updatePoisonStatus();
+    }
+  }
+}
+
+function spawnRootHazard(position, damageMultiplierForHazard) {
+  const hazard = new THREE.Group();
+  const warning = new THREE.Group();
+  const marker = new THREE.Mesh(
+    new THREE.CircleGeometry(3.25, 40),
+    new THREE.MeshBasicMaterial({ color: 0x9b1d1d, transparent: true, opacity: 0.28, depthWrite: false })
+  );
+  marker.rotation.x = -Math.PI / 2;
+  marker.position.y = -1.4;
+  warning.add(marker);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(3.05, 0.09, 6, 40),
+    new THREE.MeshBasicMaterial({ color: 0xff4b3e, transparent: true, opacity: 0.9, depthWrite: false })
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = -1.34;
+  warning.add(ring);
+
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 + 0.2;
+    const crackPoints = [
+      new THREE.Vector3(Math.cos(angle) * 0.45, -1.32, Math.sin(angle) * 0.45),
+      new THREE.Vector3(Math.cos(angle + 0.08) * 1.65, -1.32, Math.sin(angle + 0.08) * 1.65),
+      new THREE.Vector3(Math.cos(angle - 0.06) * 2.8, -1.32, Math.sin(angle - 0.06) * 2.8)
+    ];
+    warning.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(crackPoints),
+      new THREE.LineBasicMaterial({ color: 0xff5d4d, transparent: true, opacity: 0.86 })
+    ));
+  }
+  hazard.add(warning);
+
+  const spikes = new THREE.Group();
+  for (let i = 0; i < 9; i++) {
+    const angle = (i / 9) * Math.PI * 2 + Math.random() * 0.3;
+    const distance = 0.45 + Math.random() * 2.35;
+    const spike = new THREE.Mesh(
+      new THREE.ConeGeometry(0.32 + Math.random() * 0.18, 1.9 + Math.random() * 0.65, 5),
+      new THREE.MeshStandardMaterial({ color: 0x762727, emissive: 0x310707, roughness: 0.78 })
+    );
+    spike.position.set(Math.cos(angle) * distance, -0.35, Math.sin(angle) * distance);
+    spike.rotation.z = (Math.random() - 0.5) * 0.22;
+    spikes.add(spike);
+  }
+  spikes.visible = false;
+  hazard.add(spikes);
+  hazard.position.set(position.x, 0, position.z);
+  hazard.userData = {
+    phase: 'warning',
+    timer: 1,
+    radius: 3.25,
+    damageCooldown: 0,
+    damageMultiplier: damageMultiplierForHazard,
+    warning,
+    marker,
+    spikes
+  };
+  scene.add(hazard);
+  rootHazards.push(hazard);
+}
+
+function updateRootHazards(delta) {
+  for (let i = rootHazards.length - 1; i >= 0; i--) {
+    const hazard = rootHazards[i];
+    const data = hazard.userData;
+    data.timer -= delta;
+    if (data.phase === 'warning') {
+      const pulse = 0.72 + (Math.sin(clock.elapsedTime * 12) + 1) * 0.14;
+      data.marker.material.opacity = pulse * 0.32;
+      data.warning.scale.setScalar(0.96 + (Math.sin(clock.elapsedTime * 10) + 1) * 0.025);
+      if (data.timer <= 0) {
+        data.phase = 'spikes';
+        data.timer = 2;
+        data.damageCooldown = 0;
+        data.warning.visible = false;
+        data.spikes.visible = true;
+      }
+    } else {
+      data.damageCooldown -= delta;
+      const dx = player.position.x - hazard.position.x;
+      const dz = player.position.z - hazard.position.z;
+      if (player.position.y <= 0.25 && dx * dx + dz * dz <= data.radius * data.radius && data.damageCooldown <= 0) {
+        damagePlayer(1.5 * data.damageMultiplier);
+        data.damageCooldown = 1;
+      }
+    }
+
+    if (data.phase === 'spikes' && data.timer <= 0) {
+      scene.remove(hazard);
+      hazard.traverse((part) => {
+        if (part.geometry) part.geometry.dispose();
+        if (part.material) part.material.dispose();
+      });
+      rootHazards.splice(i, 1);
+    }
+  }
+}
+
 function updateEnemies(delta) {
   for (let i = enemies.length - 1; i >= 0; i--) {
     const enemy = enemies[i];
@@ -4593,6 +4832,26 @@ function updateEnemies(delta) {
         direction.multiplyScalar(1.15);
       } else if (data.type === 'tank') {
         direction.multiplyScalar(0.85);
+      } else if (data.type === 'rootBoss') {
+        direction.normalize();
+        data.abilityTimer -= delta;
+        if (data.abilityState === 'idle' && data.abilityTimer <= 0) {
+          data.abilityState = 'rootTelegraph';
+          data.abilityPhaseTimer = 1;
+          spawnRootHazard(player.position, data.bossDamageMultiplier);
+          if (messageElement) messageElement.textContent = 'O Jardineiro ergue o braço: raízes marcadas no chão!';
+        }
+
+        if (data.abilityState === 'rootTelegraph') {
+          direction.multiplyScalar(0.25);
+          data.abilityPhaseTimer -= delta;
+          if (data.abilityPhaseTimer <= 0) {
+            data.abilityState = 'idle';
+            data.abilityTimer = getBossAbilityDelay(data, 6, 8);
+          }
+        } else {
+          direction.multiplyScalar(0.75);
+        }
       } else if (data.type === 'boss') {
         direction.normalize();
         data.abilityTimer -= delta;
@@ -5518,6 +5777,10 @@ function resetGame() {
   reloadDuration = 1.6;
   maxPlayerHealth = STARTING_PLAYER_HEALTH;
   playerHealth = maxPlayerHealth;
+  poisonDuration = 0;
+  poisonDamageTimer = 0;
+  poisonExposure = 0;
+  updatePoisonStatus();
   paused = false;
   currentWave = 1;
   resetBossOrder();
@@ -5594,6 +5857,20 @@ function resetGame() {
   });
   enemyProjectiles.forEach((p) => scene.remove(p));
   acidPuddles.forEach((p) => scene.remove(p));
+  sporeClouds.forEach((cloud) => {
+    scene.remove(cloud);
+    cloud.traverse((part) => {
+      if (part.geometry) part.geometry.dispose();
+      if (part.material) part.material.dispose();
+    });
+  });
+  rootHazards.forEach((hazard) => {
+    scene.remove(hazard);
+    hazard.traverse((part) => {
+      if (part.geometry) part.geometry.dispose();
+      if (part.material) part.material.dispose();
+    });
+  });
   electricCharges.forEach((charge) => {
     scene.remove(charge);
     charge.traverse((part) => {
@@ -5627,6 +5904,8 @@ function resetGame() {
   chestSmokeEffects.length = 0;
   enemyProjectiles.length = 0;
   acidPuddles.length = 0;
+  sporeClouds.length = 0;
+  rootHazards.length = 0;
   electricCharges.length = 0;
   electricDetonations.length = 0;
   electricBolts.length = 0;
@@ -6083,7 +6362,7 @@ let scientistQuestAccepted = false, scientistQuestDone = false, scientistQuestKi
 let secretFrog = null, frogDead = false;
 const QUEST_TARGET = 35;
 const QUEST_ELITE_TARGET = 2;
-const QUEST_ELITE_TYPES = new Set(['boss', 'wolf', 'necromancer', 'parasiteBoss', 'electrician']);
+const QUEST_ELITE_TYPES = new Set(['boss', 'wolf', 'necromancer', 'parasiteBoss', 'electrician', 'entity', 'rootBoss']);
 const SCIENTIST_APPEAR_WAVE = 14;
 const SCIENTIST_QUEST_TARGET = 50;
 function spawnDoomguy() {
@@ -6483,6 +6762,8 @@ function animate() {
     updateMuzzleFlashes(delta);
     updateEnemyProjectiles(delta);
     updateAcidPuddles(delta);
+    updateSporeClouds(delta);
+    updateRootHazards(delta);
     updateEntitySmokeClouds(delta);
     updateEntityBlastEffects(delta);
     updateElectricHazards(delta);

@@ -51,7 +51,7 @@
           <li><span class="key">F</span><span>Abrir 2 baús a cada 5 ondas</span></li>
           <li><span class="key">Esc</span><span>Pausar / Configurações</span></li>
         </ul>
-        <p class="briefing-note">Zumbis deixam <strong>sucata</strong>; concluir cada onda também garante um bônus crescente. Alguns inimigos soltam munição ou kits médicos, mas a reserva de munição tem limite. A cada 5 ondas aparecem 2 baús: abra-os com F para encontrar recompensas ou um Mimic.</p>
+        <p class="briefing-note">Zumbis deixam <strong>sucata</strong>; concluir cada onda também garante um bônus crescente. A cada 3 ondas, um novo tipo de zumbi se junta à horda; os tipos já desbloqueados continuam aparecendo. O Zumbi Fúngico deixa esporos: saia da nuvem antes de 2 segundos. Kits médicos removem o veneno. A cada 5 ondas aparecem 2 baús: abra-os com F para encontrar recompensas ou um Mimic. Cuidado com as marcas vermelhas do Jardineiro.</p>
       </div>
       <div class="hazard-bar bottom"></div>
     </div>
@@ -92,7 +92,7 @@
           </div>
           <button id="buy-rifle" class="btn btn-secondary btn-small">Comprar (135 sucata)</button>
         </div>
-        <div class="shop-item"><div class="shop-item-info"><strong>Kit médico</strong><span class="shop-item-detail">Recupera 3 pontos de vida</span></div><button id="buy-life" class="btn btn-secondary btn-small">Comprar (15 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Kit médico</strong><span class="shop-item-detail">Recupera 3 pontos de vida e remove o veneno</span></div><button id="buy-life" class="btn btn-secondary btn-small">Comprar (15 sucata)</button></div>
         <div class="shop-item"><div class="shop-item-info"><strong>Colete reforçado</strong><span class="shop-item-detail">+2 de vida máxima e cura 2 (máximo: 20)</span></div><button id="buy-vest" class="btn btn-secondary btn-small">Comprar (45 sucata)</button></div>
         <div class="shop-item"><div class="shop-item-info"><strong>Munição avulsa</strong><span class="shop-item-detail">Até duas recargas, conforme o espaço na reserva</span></div><button id="buy-ammo" class="btn btn-secondary btn-small">Comprar (12 sucata)</button></div>
         <div class="shop-item"><div class="shop-item-info"><strong>Recarga rápida</strong><span class="shop-item-detail">Reduz o tempo de recarga em 0,25 s (até 3 níveis)</span></div><button id="buy-reload-perk" class="btn btn-secondary btn-small">Comprar (55 sucata)</button></div>
@@ -111,6 +111,7 @@
         <div id="health-bar" role="progressbar" aria-label="Vida" aria-valuemin="0" aria-valuemax="10" aria-valuenow="10">
           <div id="health-fill"></div>
         </div>
+        <div id="poison-status" hidden role="status" aria-live="polite"></div>
       </div>
       <div id="score">Pontuação: 0</div>
       <div id="scrap-indicator">Sucata: 0</div>
