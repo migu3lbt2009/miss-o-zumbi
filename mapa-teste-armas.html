@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laboratorio de Armas | Missao Zumbi</title>
+<link rel="icon" type="image/png" href="fotos/interface/machado-favicon.png">
+<style>
+:root{--green:#a7f36b;--amber:#ffc35a;--ink:#e6f2df;--muted:#9ab296;--panel:#071008dd;--line:#355838;--red:#ff8066}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 20%,#315e35,#102313 55%,#050805);color:var(--ink);font-family:Consolas,"Trebuchet MS",sans-serif}canvas{display:block}#hud{position:fixed;inset:0;z-index:2;pointer-events:none}.panel{position:absolute;background:linear-gradient(145deg,rgba(16,37,19,.92),var(--panel));border:1px solid var(--line);box-shadow:0 10px 28px #0006,0 0 20px #7cda4d18;padding:14px 16px}.top{top:16px;left:16px}.eyebrow{font-size:11px;letter-spacing:.2em;color:var(--green)}h1{font-size:24px;margin:7px 0 3px}.weapon-name{color:var(--amber);font-size:14px}.help{top:16px;left:50%;transform:translateX(-50%);text-align:center;color:var(--muted);font-size:12px;line-height:1.5}.stats{right:16px;top:16px;text-align:right;color:var(--muted);font-size:12px;line-height:1.8}.stats b{color:var(--green);font-size:16px}.crosshair{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%)}.crosshair:before,.crosshair:after{content:"";position:absolute;background:var(--green);box-shadow:0 0 7px var(--green)}.crosshair:before{left:10px;top:0;width:2px;height:22px}.crosshair:after{left:0;top:10px;height:2px;width:22px}.bottom{bottom:16px;left:50%;transform:translateX(-50%);width:min(760px,94vw);padding:8px;pointer-events:auto}.weapons{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.weapon-button{border:1px solid var(--line);background:#09140bdd;color:var(--muted);padding:6px 9px;cursor:pointer;font:12px Consolas,sans-serif;min-width:104px;display:inline-flex;align-items:center;gap:7px;transition:.16s}.weapon-button img{width:38px;height:30px;object-fit:contain;filter:drop-shadow(0 0 5px #a7f36b55)}.weapon-button:hover,.weapon-button.active{border-color:var(--green);color:var(--green);background:#172c18;transform:translateY(-2px)}.back{position:absolute;right:16px;bottom:16px;color:var(--green);text-decoration:none;border:1px solid var(--line);padding:10px 13px;background:var(--panel);pointer-events:auto;font-size:12px}.notice{position:absolute;left:50%;bottom:104px;transform:translateX(-50%);color:var(--amber);font-size:13px;text-shadow:0 1px 4px #000;opacity:0;transition:opacity .15s}.notice.show{opacity:1}@media(max-width:650px){.help{top:100px;width:90%;font-size:11px}.stats{top:72px;right:12px}.top{top:12px;left:12px}.top h1{font-size:19px}.bottom{bottom:10px}.weapon-button{min-width:76px;padding:8px 5px}.weapon-button img{width:30px;height:24px}.back{right:12px;bottom:100px}}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="panel top"><div class="eyebrow">03 // LABORATORIO</div><h1>TESTE DE ARMAS</h1><div id="weapon-name" class="weapon-name">PISTOLA // TECLA 1</div></div>
+  <div class="panel help">WASD move | Mouse olha | Clique esquerdo dispara uma vez | Botao direito: especial das espadas<br>Zumbis parados de todos os tipos, incluindo chefes. Cada alvo retorna apos 5 segundos.</div>
+  <div class="panel stats">ACERTOS <b id="hits">0</b><br>TIROS <b id="shots">0</b></div>
+  <div class="crosshair"></div><div id="notice" class="notice">ALVO ATINGIDO</div>
+  <div class="panel bottom"><div id="weapons" class="weapons"></div></div>
+  <a class="back" href="index.html">&larr; MENU</a>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x28352b);scene.fog=new THREE.Fog(0x28352b,38,105);
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,220);
+const yaw=new THREE.Object3D();const pitch=new THREE.Object3D();pitch.add(camera);yaw.add(pitch);yaw.position.set(0,1.8,12);scene.add(yaw);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xb7c9b3,0x202821,.78));const sun=new THREE.DirectionalLight(0xd8e3d5,.72);sun.position.set(-10,18,8);scene.add(sun);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.MeshStandardMaterial({color:0x252b29,roughness:1}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+const laneMaterial=new THREE.MeshStandardMaterial({color:0x807443,roughness:1});
+for(let i=0;i<=5;i++){const divider=new THREE.Mesh(new THREE.BoxGeometry(.12,.18,58),new THREE.MeshStandardMaterial({color:0x424a43,roughness:.9}));divider.position.set(-20+i*8,.09,-15);scene.add(divider)}
+for(const distance of [-2,-12,-22,-32,-42]){const marker=new THREE.Mesh(new THREE.BoxGeometry(40,.025,.12),laneMaterial);marker.position.set(0,.02,distance);scene.add(marker)}
+const backstop=new THREE.Mesh(new THREE.BoxGeometry(44,9,1),new THREE.MeshStandardMaterial({color:0x343b36,roughness:.95}));backstop.position.set(0,4.5,-54);scene.add(backstop);
+const targetDefinitions=[
+  {type:'walker',name:'ZUMBI NORMAL',path:'fotos/zumbis/zumbi-normal.png',health:10,size:[2.2,3]},
+  {type:'rusher',name:'ZUMBI CORREDOR',path:'fotos/zumbis/inimigo-corredor.webp',health:15,size:[2.2,3]},
+  {type:'dodger',name:'ZUMBI ESPERTO',path:'fotos/zumbis/zumbi-esperto.png',health:12,size:[2.2,3]},
+  {type:'tank',name:'ZUMBI TANQUE',path:'fotos/zumbis/zumbi-tank.png',health:30,size:[2.7,3.6]},
+  {type:'bloater',name:'ZUMBI EXPLOSIVO',path:'fotos/zumbis/zumbi-explode.png',health:22,size:[2.2,3]},
+  {type:'mimic',name:'MIMIC',path:'fotos/chefes/mini chefe Mimic.webp',health:240,size:[3.2,2.6]},
+  {type:'jumper',name:'ZUMBI PULADOR',path:'fotos/zumbis/zumbi que pula.png',health:35,size:[2.6,3.4],spriteY:0.82,statusY:1.2,groundLift:-0.18},
+  {type:'shooter',name:'ZUMBI ATIRADOR',path:'fotos/zumbis/zumbi-acido_atirador.png',health:15,size:[2.7,3.8]},
+  {type:'skeleton',name:'ZUMBI ESQUELETO',path:'fotos/zumbis/zumbi-esqueleo.png',health:18,size:[2.2,3]},
+  {type:'wolf_minion',name:'LOBO ZUMBI',path:'fotos/zumbis/lobo-zumbi.png',health:28,size:[2.45,1.85]},
+  {type:'boss',name:'CHEFE BRUTOS',path:'fotos/chefes/chefe-textura.png',health:75,size:[3.2,4]},
+  {type:'entity',name:'DEMÔNIO DA FUMAÇA',path:'fotos/chefes/Demônio de Fumaça Carmesim.png',health:220,size:[3.8,4.8]},
+  {type:'wolf',name:'CHEFE LOBO INFERNAL',path:'fotos/chefes/chefe-lobo_infernal.png',health:150,size:[3.4,2.7]},
+  {type:'necromancer',name:'CHEFE NECROMANTE',path:'fotos/chefes/chefe-necromante.png',health:300,size:[3.4,4.2]}
+];
+const targets=[];
+const zombieTextureLoader=new THREE.TextureLoader();
+function updateTargetStatus(target){
+  const {context,canvas,texture}=target.status;
+  context.clearRect(0,0,canvas.width,canvas.height);
+  context.fillStyle='rgba(7,12,9,.92)';
+  context.fillRect(0,0,canvas.width,canvas.height);
+  context.fillStyle='#dce8d8';
+  context.font='bold 18px Consolas, monospace';
+  context.textAlign='center';
+  context.fillText(target.definition.name,canvas.width/2,20,canvas.width-12);
+  context.fillStyle='#29332d';
+  context.fillRect(20,31,canvas.width-40,12);
+  const ratio=Math.max(0,target.health/target.maxHealth);
+  context.fillStyle=ratio<.35?'#ff6658':'#8fef4d';
+  context.fillRect(20,31,(canvas.width-40)*ratio,12);
+  texture.needsUpdate=true;
+}
+targetDefinitions.forEach((definition,index)=>{
+  const group=new THREE.Group();
+  const baseTint=new THREE.Color(0xffffff).multiplyScalar(1.22);
+  const material=new THREE.SpriteMaterial({color:baseTint,transparent:true,alphaTest:.08,depthWrite:false,fog:false});
+  const sprite=new THREE.Sprite(material);
+  sprite.scale.set(...definition.size);
+  sprite.position.y=definition.spriteY ?? (definition.size[1]/2);
+  group.add(sprite);
+  const x=(index%5-2)*8;
+  const z=-19-Math.floor(index/5)*12;
+  group.position.set(x, definition.groundLift ?? 0, z);
+  const statusCanvas=document.createElement('canvas');
+  statusCanvas.width=256;statusCanvas.height=48;
+  const status={canvas:statusCanvas,context:statusCanvas.getContext('2d'),texture:new THREE.CanvasTexture(statusCanvas)};
+  status.texture.minFilter=THREE.LinearFilter;
+  const statusSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:status.texture,transparent:true,depthWrite:false,fog:false}));
+  statusSprite.scale.set(3.3,.62,1);
+  statusSprite.position.y=definition.statusY ?? (definition.size[1]+.62);
+  group.add(statusSprite);
+  scene.add(group);
+  const target={group,sprite,status,statusSprite,baseTint,definition,health:definition.health,maxHealth:definition.health,hits:0,damageTaken:0,hitFlash:0,deadUntil:0};
+  targets.push(target);
+  updateTargetStatus(target);
+  zombieTextureLoader.load(definition.path,texture=>{
+    texture.encoding=THREE.sRGBEncoding;
+    sprite.material.map=texture;
+    sprite.material.needsUpdate=true;
+  },undefined,()=>showNotice('NAO FOI POSSIVEL CARREGAR '+definition.name));
+});
+const weapons={knife:['bastao-faca.png','FACA',1],pistol:['pistola.gif','PISTOLA',2],shotgun:['shotgun.webp','SHOTGUN',3],magnum:['magnum.webp','MAGNUM',4],smg:['submetralhadora.gif','SUBMETRALHADORA',5],sniper:['rifle.gif','RIFLE DE PRECISAO',6],greatsword:['Moonlight-greatsword.png','GREATSWORD',7],doomSword:['spada-doom.webp','ESPADA DOOM',8],rifle:['fuzil.png','FUZIL DE ASSALTO',9]};const order=Object.keys(weapons);let current='pistol';let weaponMesh=null;let shots=0;let hits=0;let lastShot=0;let lastSpecialAttack=0;let attackAnimationTimer=0;const keys={};const weaponGroup=new THREE.Group();weaponGroup.position.set(0,-.48,-1.20);camera.add(weaponGroup);
+const weaponSizes={pistol:[2.15,1.13],knife:[1.12,1.12],magnum:[1.04,.76],smg:[1.72,.98],sniper:[1.82,.94],shotgun:[1.30,.68],rifle:[2.52,1.25],doomSword:[2,1.9],greatsword:[1.42,2.35]};
+function getWeaponPosition(id){if(id==='knife')return{ x:.24, y:.18, z:0 };if(id==='magnum')return{ x:.32, y:-.14, z:0 };if(id==='shotgun')return{ x:0, y:-.16, z:0 };if(id==='rifle')return{ x:.24, y:-.04, z:-.18 };if(id==='pistol')return{ x:-.18, y:0, z:-.12 };if(id==='doomSword'||id==='greatsword')return{ x:.22, y:-.2, z:0 };return{ x:0, y:0, z:0 }}
+function selectWeapon(id){current=id;weaponGroup.clear();const size=weaponSizes[id];const geometry=new THREE.PlaneGeometry(size[0],size[1]);const position=getWeaponPosition(id);const textureLoader=new THREE.TextureLoader();const addWeaponSprite=texture=>{const material=id==='smg'?new THREE.ShaderMaterial({uniforms:{map:{value:texture}},vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform sampler2D map;varying vec2 vUv;void main(){vec4 color=texture2D(map,vUv);if(color.a<0.05||max(max(color.r,color.g),color.b)<0.025)discard;gl_FragColor=color;}',transparent:true,depthWrite:false}):new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false});weaponMesh=new THREE.Mesh(geometry,material);weaponMesh.position.set(position.x,position.y,position.z);weaponGroup.add(weaponMesh)};textureLoader.load('fotos/armas/'+weapons[id][0],addWeaponSprite,undefined,()=>{const fallback=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:id==='knife'?0xc9d1c8:0x394a38,metalness:.65,roughness:.3}));fallback.position.set(position.x,position.y,position.z);weaponMesh=fallback;weaponGroup.add(fallback)});document.getElementById('weapon-name').textContent=weapons[id][1]+' // TECLA '+weapons[id][2];document.querySelectorAll('.weapon-button').forEach(button=>button.classList.toggle('active',button.dataset.weapon===id))}
+const weaponBar=document.getElementById('weapons');order.forEach(id=>{const button=document.createElement('button');button.className='weapon-button';button.dataset.weapon=id;button.innerHTML='<img src="fotos/armas/'+weapons[id][0]+'" alt=""><span>'+weapons[id][2]+'  '+weapons[id][1]+'</span>';button.onclick=()=>selectWeapon(id);weaponBar.appendChild(button)});selectWeapon(current);
+function showNotice(text){const notice=document.getElementById('notice');notice.textContent=text;notice.classList.add('show');clearTimeout(showNotice.timer);showNotice.timer=setTimeout(()=>notice.classList.remove('show'),300)}
+const weaponDamage={knife:5,pistol:2.4,shotgun:.90,magnum:10.2,smg:1.12,sniper:13.2,rifle:13.2,doomSword:30,greatsword:12};
+const weaponFire={knife:{cooldown:350},pistol:{cooldown:500},shotgun:{cooldown:700,pellets:8,spread:.20},magnum:{cooldown:750},smg:{cooldown:90},sniper:{cooldown:1100},rifle:{cooldown:1100},doomSword:{cooldown:420,meleeCooldown:220},greatsword:{cooldown:1600,meleeCooldown:280}};
+const projectiles=[];
+const projectileSpeed=72;
+const raycaster=new THREE.Raycaster();
+raycaster.camera=camera;
+const hitTint=new THREE.Color(0xff7777);
+function registerHit(target,damage){if(target.deadUntil)return;target.hits++;target.damageTaken+=damage;target.health=Math.max(0,target.health-damage);target.hitFlash=.16;updateTargetStatus(target);hits++;document.getElementById('hits').textContent=hits;if(target.health===0){target.deadUntil=performance.now()+5000;target.sprite.visible=false;target.statusSprite.visible=false;showNotice(target.definition.name+' ELIMINADO | RETORNA EM 5 SEGUNDOS')}else showNotice(target.definition.name+' | '+Math.round(damage)+' DANO')}
+function createBullet(direction,damage){
+  const geometry=new THREE.SphereGeometry(.14,8,8);
+  const bullet=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xfff6d0}));
+  const origin=new THREE.Vector3();
+  camera.getWorldPosition(origin);
+  bullet.position.copy(origin).add(direction.clone().multiplyScalar(1.2));
+  bullet.userData={velocity:direction,damage};
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({color:0xfff6c9,transparent:true,opacity:.6,blending:THREE.AdditiveBlending,depthTest:false,depthWrite:false}));
+  glow.scale.set(.4,.4,1);
+  bullet.add(glow);
+  scene.add(bullet);
+  projectiles.push(bullet);
+}
+function updateProjectiles(delta){
+  const activeSprites=targets.filter(target=>!target.deadUntil).map(target=>target.sprite);
+  for(let i=projectiles.length-1;i>=0;i--){
+    const projectile=projectiles[i];
+    const step=projectileSpeed*delta;
+    const direction=projectile.userData.velocity;
+    raycaster.set(projectile.position,direction);
+    raycaster.far=step+.2;
+    const hit=raycaster.intersectObjects(activeSprites,false)[0];
+    if(hit){
+      const target=targets.find(item=>item.sprite===hit.object);
+      if(target)registerHit(target,projectile.userData.damage);
+      scene.remove(projectile);
+      projectile.geometry.dispose();
+      projectile.material.dispose();
+      projectile.children[0].material.dispose();
+      projectiles.splice(i,1);
+      continue;
+    }
+    projectile.position.addScaledVector(direction,step);
+    projectile.userData.travelled=(projectile.userData.travelled||0)+step;
+    if(projectile.userData.travelled>160){
+      scene.remove(projectile);
+      projectile.geometry.dispose();
+      projectile.material.dispose();
+      projectile.children[0].material.dispose();
+      projectiles.splice(i,1);
+    }
+  }
+}
+function shoot(){
+  const now=performance.now();
+  const settings=weaponFire[current];
+  const cooldown=settings.meleeCooldown||settings.cooldown;
+  if(now-lastShot<cooldown)return;
+  lastShot=now;
+  shots++;
+  document.getElementById('shots').textContent=shots;
+  const direction=new THREE.Vector3();
+  camera.getWorldDirection(direction).normalize();
+  if(current==='doomSword'||current==='greatsword'){
+    attackAnimationTimer=.32;
+    raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+    raycaster.far=5.8;
+    const hit=raycaster.intersectObjects(targets.filter(target=>!target.deadUntil).map(target=>target.sprite),false)[0];
+    const target=hit&&targets.find(item=>item.sprite===hit.object);
+    if(target)registerHit(target,weaponDamage[current]);
+    else showNotice('GOLPE CORPO A CORPO: CHEGUE MAIS PERTO');
+    return;
+  }
+  const pellets=settings.pellets||1;
+  for(let i=0;i<pellets;i++){
+    const shotDirection=direction.clone();
+    if(settings.spread){
+      shotDirection.x+=(Math.random()-.5)*settings.spread;
+      shotDirection.y+=(Math.random()-.5)*settings.spread;
+      shotDirection.z+=(Math.random()-.5)*settings.spread;
+      shotDirection.normalize();
+    }
+    createBullet(shotDirection,weaponDamage[current]);
+  }
+}
+function specialAttack(){const now=performance.now();if(now-lastSpecialAttack<weaponFire[current].cooldown)return;lastSpecialAttack=now;shots++;document.getElementById('shots').textContent=shots;const origin=new THREE.Vector3();camera.getWorldPosition(origin);let affected=[];if(current==='doomSword'){affected=targets.filter(target=>!target.deadUntil&&target.group.position.distanceTo(origin)<=7.2);affected.forEach(target=>registerHit(target,weaponDamage.doomSword));showNotice(affected.length?'ESPADA DOOM | '+affected.length+' ALVOS NO ATAQUE EM AREA':'ESPADA DOOM | NENHUM ALVO PROXIMO');return}raycaster.setFromCamera(new THREE.Vector2(0,0),camera);raycaster.far=38;const meshes=targets.filter(target=>!target.deadUntil).map(target=>target.sprite);const results=raycaster.intersectObjects(meshes,false);const seen=new Set();for(const result of results){const target=targets.find(item=>item.sprite===result.object);if(target&&!seen.has(target)){seen.add(target);affected.push(target)}}affected.forEach(target=>registerHit(target,22));const direction=new THREE.Vector3();camera.getWorldDirection(direction);const beamLength=affected.length?Math.min(38,origin.distanceTo(affected[0].group.position)):38;const beam=new THREE.Mesh(new THREE.CylinderGeometry(.10,.10,beamLength,8),new THREE.MeshBasicMaterial({color:0x39aaff,transparent:true,opacity:.8,blending:THREE.AdditiveBlending}));beam.position.copy(origin).add(direction.multiplyScalar(beamLength/2));beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),camera.getWorldDirection(new THREE.Vector3()));scene.add(beam);setTimeout(()=>{scene.remove(beam);beam.geometry.dispose();beam.material.dispose()},140);showNotice(affected.length?'ONDA DE RAIO AZUL | '+affected.length+' ALVOS':'ONDA DE RAIO AZUL | ALCANCE MAXIMO 38')}
+function move(delta){const speed=(keys.ShiftLeft||keys.ShiftRight)?10:5.5;const direction=new THREE.Vector3();if(keys.KeyW)direction.z-=1;if(keys.KeyS)direction.z+=1;if(keys.KeyA)direction.x-=1;if(keys.KeyD)direction.x+=1;if(direction.lengthSq()){direction.normalize().multiplyScalar(speed*delta);direction.applyAxisAngle(new THREE.Vector3(0,1,0),yaw.rotation.y);yaw.position.add(direction)}yaw.position.x=Math.max(-42,Math.min(42,yaw.position.x));yaw.position.z=Math.max(-46,Math.min(18,yaw.position.z))}
+addEventListener('keydown',event=>{keys[event.code]=true;const slot=Number(event.key);const id=order.find(weapon=>weapons[weapon][2]===slot);if(id)selectWeapon(id)});addEventListener('keyup',event=>{keys[event.code]=false});renderer.domElement.addEventListener('pointerdown',event=>{if(event.button===0){renderer.domElement.requestPointerLock();shoot()}if(event.button===2&&(current==='doomSword'||current==='greatsword')){specialAttack();event.preventDefault()}});addEventListener('contextmenu',event=>event.preventDefault());addEventListener('mousemove',event=>{if(document.pointerLockElement!==renderer.domElement)return;yaw.rotation.y-=event.movementX*.0022;pitch.rotation.x-=event.movementY*.0022;pitch.rotation.x=Math.max(-1.35,Math.min(1.35,pitch.rotation.x))});
+let previous=performance.now();function animate(time){const delta=Math.min(.05,(time-previous)/1000);previous=time;move(delta);updateProjectiles(delta);targets.forEach(target=>{if(target.deadUntil&&time>=target.deadUntil){target.deadUntil=0;target.health=target.maxHealth;target.hits=0;target.damageTaken=0;target.sprite.visible=true;target.statusSprite.visible=true;updateTargetStatus(target);showNotice(target.definition.name+' RETORNOU AO LABORATORIO')}target.hitFlash=Math.max(0,target.hitFlash-delta);if(target.sprite.material)target.sprite.material.color.copy(target.hitFlash>0?hitTint:target.baseTint)});attackAnimationTimer=Math.max(0,attackAnimationTimer-delta);const swing=attackAnimationTimer>0?Math.sin((1-attackAnimationTimer/.32)*Math.PI):0;weaponGroup.position.set(-swing*.32,-.48+swing*.12,-1.20+swing*.12);weaponGroup.rotation.z=swing*.8+Math.sin(time*.003)*.012;renderer.render(scene,camera);requestAnimationFrame(animate)}addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

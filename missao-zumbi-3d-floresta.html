@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Missão Zumbi 3D</title>
+  <link rel="icon" type="image/png" href="fotos/interface/machado-favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/missao-zumbi-floresta.css" />
+</head>
+<body>
+
+  <!-- MENU PRINCIPAL -->
+  <div id="main-menu" class="screen">
+    <div class="scanlines"></div>
+    <div class="menu-content">
+      <div class="hazard-bar top"></div>
+      <p class="eyebrow">SETOR 7 &mdash; ZONA DE QUARENTENA</p>
+      <h1 class="game-title" data-text="MISSÃO ZUMBI">MISSÃO ZUMBI</h1>
+      <p class="menu-tagline">As ondas não param. A munição é finita. Sobreviva.</p>
+
+      <div class="menu-actions">
+        <button id="play-button" class="btn btn-primary">
+          <span class="btn-index">01</span> Jogar
+        </button>
+        <button id="open-settings-from-menu" class="btn btn-secondary">
+          <span class="btn-index">02</span> Configurações
+        </button>
+        <button id="open-city-map" class="btn btn-secondary" disabled>
+          <span class="btn-index">03</span> Mapa da cidade — temporariamente bloqueado
+        </button>
+      </div>
+      <a href="index.html" class="btn btn-back-central">← Voltar para a central</a>
+
+      <div class="briefing-panel">
+        <h3>Ficha de campo</h3>
+        <ul class="control-list">
+          <li><span class="key">W A S D</span><span>Mover</span></li>
+          <li><span class="key">Shift</span><span>Correr (não recarrega enquanto corre)</span></li>
+          <li><span class="key">Mouse</span><span>Mirar</span></li>
+          <li><span class="key">Clique esquerdo</span><span>Atirar</span></li>
+          <li><span class="key">Espaço</span><span>Pular</span></li>
+          <li><span class="key">1 2 3 4 5 6</span><span>Trocar de arma</span></li>
+          <li><span class="key">7</span><span>Lança-granadas</span></li>
+          <li><span class="key">9</span><span>Greatsword</span></li>
+          <li><span class="key">R</span><span>Recarregar</span></li>
+          <li><span class="key">Botão direito</span><span>Mira</span></li>
+          <li><span class="key">E</span><span>Abrir a loja</span></li>
+          <li><span class="key">F</span><span>Abrir 2 baús a cada 5 ondas</span></li>
+          <li><span class="key">Esc</span><span>Pausar / Configurações</span></li>
+        </ul>
+        <p class="briefing-note">Zumbis deixam <strong>sucata</strong>; concluir cada onda também garante um bônus crescente. Alguns inimigos soltam munição ou kits médicos, mas a reserva de munição tem limite. A cada 5 ondas aparecem 2 baús: abra-os com F para encontrar recompensas ou um Mimic.</p>
+      </div>
+      <div class="hazard-bar bottom"></div>
+    </div>
+  </div>
+
+  <!-- LOJA -->
+  <div id="shop-menu" class="hidden overlay-screen">
+    <div class="menu-panel">
+      <h2>Loja &amp; Melhorias</h2>
+      <p>Ganhe sucata eliminando zumbis e ao concluir ondas. Planeje compras: melhorias ficam mais caras a cada nível.</p>
+      <p class="shop-scrap">Sucata disponível: <strong id="shop-scrap-value">0</strong></p>
+      <div class="shop-items">
+        <div class="shop-item">
+          <div class="shop-item-info">
+            <strong>Magnum</strong>
+            <span class="shop-item-detail">Revólver de dano alto e tiro pesado — tecla 4</span>
+          </div>
+          <button id="buy-shotgun" class="btn btn-secondary btn-small">Comprar (85 sucata)</button>
+        </div>
+        <div class="shop-item">
+          <div class="shop-item-info">
+            <strong>12</strong>
+            <span class="shop-item-detail">Oito projéteis por disparo, ótima de perto — tecla 3</span>
+          </div>
+          <button id="buy-shotgun12" class="btn btn-secondary btn-small">Comprar (70 sucata)</button>
+        </div>
+        <div class="shop-item">
+          <div class="shop-item-info">
+            <strong>Submetralhadora</strong>
+            <span class="shop-item-detail">Cadência rápida; segure o clique para disparar — tecla 5</span>
+          </div>
+          <button id="buy-smg" class="btn btn-secondary btn-small">Comprar (100 sucata)</button>
+        </div>
+        <div class="shop-item">
+          <div class="shop-item-info">
+            <strong>Rifle de Precisão</strong>
+            <span class="shop-item-detail">Dano alto e tiro lento; munição limitada — tecla 6</span>
+          </div>
+          <button id="buy-rifle" class="btn btn-secondary btn-small">Comprar (135 sucata)</button>
+        </div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Kit médico</strong><span class="shop-item-detail">Recupera 3 pontos de vida</span></div><button id="buy-life" class="btn btn-secondary btn-small">Comprar (15 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Colete reforçado</strong><span class="shop-item-detail">+2 de vida máxima e cura 2 (máximo: 20)</span></div><button id="buy-vest" class="btn btn-secondary btn-small">Comprar (45 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Munição avulsa</strong><span class="shop-item-detail">Até duas recargas, conforme o espaço na reserva</span></div><button id="buy-ammo" class="btn btn-secondary btn-small">Comprar (12 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Recarga rápida</strong><span class="shop-item-detail">Reduz o tempo de recarga em 0,25 s (até 3 níveis)</span></div><button id="buy-reload-perk" class="btn btn-secondary btn-small">Comprar (55 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Instinto selvagem</strong><span class="shop-item-detail">Tiros na cabeça recuperam 1 de vida por nível (até 3)</span></div><button id="buy-lifesteal-perk" class="btn btn-secondary btn-small">Comprar (65 sucata)</button></div>
+      </div>
+      <p class="settings-help">Troque de arma com as teclas 1 (canivete), 2 (pistola), 3 (12), 4 (magnum), 5 (submetralhadora), 6 (rifle), 7 (lança-granadas) e 9 (greatsword).</p>
+      <button id="close-shop-button" class="btn btn-secondary">Voltar</button>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="game-ui" class="hidden">
+    <div id="ui-top">
+      <div id="health-container">
+        <div class="label"><span>Vida</span><span id="health-value">10/10</span></div>
+        <div id="health-bar" role="progressbar" aria-label="Vida" aria-valuemin="0" aria-valuemax="10" aria-valuenow="10">
+          <div id="health-fill"></div>
+        </div>
+      </div>
+      <div id="score">Pontuação: 0</div>
+      <div id="scrap-indicator">Sucata: 0</div>
+    </div>
+    <div id="boss-health-container" hidden role="group" aria-label="Vida do chefe">
+      <div id="boss-health-label"><span id="boss-health-name"></span><span id="boss-health-value"></span></div>
+      <div id="boss-health-bar" role="progressbar" aria-label="Vida do chefe" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+        <div id="boss-health-fill"></div>
+      </div>
+    </div>
+    <div id="game-notification" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <div id="damage-vignette" aria-hidden="true"></div>
+  <div id="heal-vignette" aria-hidden="true"></div>
+  <audio id="damage-sound" preload="auto" ></audio>
+
+  <div id="wave-counter">Onda 1</div>
+  <div id="forest-wave-banner" aria-live="polite" aria-atomic="true">
+    <h2 id="forest-wave-banner-title">ONDA 1</h2>
+    <p id="forest-wave-banner-sub">Sobreviva à horda</p>
+  </div>
+  <canvas id="forest-minimap" width="150" height="150"></canvas>
+  <div id="forest-combat-feedback"></div>
+
+    <div id="hud">
+      <h1>Missão Zumbi</h1>
+      <p id="instructions">Pressione ESC para abrir o menu de configurações.</p>
+      <p id="message">Zumbis chegando! Sobreviva o máximo possível.</p>
+    </div>
+    <div id="forest-chest-prompt" role="status">[F] ABRIR BAÚ</div>
+
+    <div id="ui-bottom">
+      <div id="ammo-indicator">Munição: 8 / 8</div>
+      <div id="weapon-ability-indicators" hidden role="group" aria-label="Recarga do especial no botão direito">
+        <svg class="weapon-special-mouse-icon" viewBox="0 0 24 28" aria-hidden="true">
+          <path class="right-button" d="M12 3a7 7 0 0 1 7 7v2h-7z"></path>
+          <path d="M12 3a7 7 0 0 0-7 7v7a7 7 0 0 0 14 0v-7a7 7 0 0 0-7-7Z"></path>
+          <path d="M12 3v9M5 12h14"></path>
+        </svg>
+        <div class="weapon-special-cooldown">
+          <span>Botão direito</span>
+          <span id="weapon-special-cooldown-value" class="weapon-ability-value">Pronto</span>
+          <div class="weapon-ability-track"><div id="weapon-special-cooldown-fill" class="weapon-ability-fill"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIGURAÇÕES -->
+  <div id="settings-menu" class="hidden overlay-screen">
+    <div class="pause-panel">
+      <h2>Configurações</h2>
+      <p>Use ESC para abrir e fechar.</p>
+      <div class="setting-row">
+        <label for="sensitivity-slider">Sensibilidade do mouse</label>
+        <input id="sensitivity-slider" type="range" min="1" max="20" value="8" />
+        <span id="sensitivity-value">8</span>
+      </div>
+      <div class="setting-row">
+        <label for="volume-slider">Volume geral</label>
+        <input id="volume-slider" type="range" min="0" max="100" value="75" />
+        <span id="volume-value">75%</span>
+      </div>
+      <div class="setting-row">
+        <label for="music-volume-slider">Música</label>
+        <input id="music-volume-slider" type="range" min="0" max="100" value="100" />
+        <span id="music-volume-value">100%</span>
+      </div>
+      <div class="setting-row">
+        <label for="effects-volume-slider">Efeitos sonoros</label>
+        <input id="effects-volume-slider" type="range" min="0" max="100" value="100" />
+        <span id="effects-volume-value">100%</span>
+      </div>
+      <div class="settings-help">O volume geral controla tudo. Música e efeitos ajustam cada categoria separadamente.</div>
+      <button id="resume-button" class="btn btn-primary">Continuar</button>
+      <button id="restart-button" class="btn btn-secondary">Reiniciar</button>
+      <a href="index.html" class="btn btn-back-central">← Voltar para a central</a>
+    </div>
+  </div>
+
+  <!-- ESCOLHA DE HABILIDADE (chefe) -->
+  <div id="boss-choice-screen" class="hidden overlay-screen">
+    <div class="menu-panel">
+      <p class="eyebrow danger">CHEFE SE APROXIMA</p>
+      <h2>Escolha um reforço</h2>
+      <p>Um poder permanente pro resto da partida. Escolha bem.</p>
+      <div class="menu-actions" style="flex-direction: column; align-items: stretch;">
+        <button id="buff-damage" class="btn btn-primary">Fúria — +15% de dano</button>
+        <button id="buff-health" class="btn btn-primary">Fortaleza — +2 de vida máxima e cura tudo</button>
+        <button id="buff-speed" class="btn btn-primary">Ímpeto — +15% de velocidade</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="gameover-screen" class="hidden overlay-screen">
+    <div class="menu-panel">
+      <p class="eyebrow danger">FIM DE LINHA</p>
+      <h2 class="danger-title">VOCÊ CAIU</h2>
+      <p id="gameover-score">Pontuação final: 0</p>
+      <p id="gameover-wave">Onda alcançada: 1</p>
+      <p id="gameover-best">Recorde: 0</p>
+      <div class="menu-actions">
+        <button id="gameover-restart-button" class="btn btn-primary">Tentar novamente</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- CONTROLES TOUCH (celular) -->
+  <div id="mobile-controls">
+    <div id="touch-look-zone"></div>
+    <div id="touch-joystick-zone">
+      <div id="touch-joystick-knob"></div>
+    </div>
+
+    <div id="touch-weapons-row">
+      <button class="touch-weapon-btn" data-weapon="knife">1</button>
+      <button class="touch-weapon-btn" data-weapon="pistol">2</button>
+      <button class="touch-weapon-btn" data-weapon="shotgun12">3</button>
+      <button class="touch-weapon-btn" data-weapon="shotgun">4</button>
+      <button class="touch-weapon-btn" data-weapon="smg">5</button>
+      <button class="touch-weapon-btn" data-weapon="rifle">6</button>
+      <button class="touch-weapon-btn" data-weapon="greatsword">7</button>
+      <button class="touch-weapon-btn" data-weapon="doomSword">8</button>
+      <button class="touch-weapon-btn" data-weapon="grenadeLauncher">9</button>
+    </div>
+
+    <button id="touch-menu-button" class="touch-btn touch-btn-round">☰</button>
+    <button id="touch-shop-button" class="touch-btn touch-btn-round">Loja</button>
+    <button id="touch-sprint-button" class="touch-btn touch-btn-round">Correr</button>
+    <button id="touch-reload-button" class="touch-btn touch-btn-round">R</button>
+    <button id="touch-special-button" class="touch-btn">DOOM</button>
+    <button id="touch-fire-button" class="touch-btn touch-btn-fire">FOGO</button>
+    <button id="touch-chest-button" class="touch-btn">ABRIR BAÚ</button>
+  </div>
+
+  
+<div id="npc-prompt">Pressione <b>Q</b> para falar</div>
+<div id="npc-dialog"><div id="npc-dialog-title">SINAL FRACO // DOOM GUY</div><div id="npc-dialog-text"></div><div id="npc-dialog-choices"></div><button id="npc-dialog-action">Ouvir proposta</button></div>
+<script type="module" src="js/missao-zumbi-floresta.js"></script>
+</body>
+</html>
