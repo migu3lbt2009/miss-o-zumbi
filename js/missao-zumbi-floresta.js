@@ -2890,6 +2890,17 @@ function updateAmmoDisplay() {
 function updateWeaponAbilityIndicators() {
   const weapon = weaponDefs[currentWeaponId];
   const isTrackedSword = currentWeaponId === 'doomSword' || currentWeaponId === 'greatsword';
+  const touchSpecialButton = document.getElementById('touch-special-button');
+  if (touchSpecialButton) {
+    const weaponName = isTrackedSword ? weapon.name : 'Espada Doom ou Greatsword';
+    const canActivate = isTrackedSword && weaponSpecialCooldownTimer <= 0 && !paused && !gameOver;
+    touchSpecialButton.disabled = !canActivate;
+    touchSpecialButton.setAttribute('aria-disabled', String(!canActivate));
+    touchSpecialButton.setAttribute('aria-label', `Habilidade especial: ${weaponName}`);
+    touchSpecialButton.title = isTrackedSword
+      ? `${weaponName}${weaponSpecialCooldownTimer > 0 ? ` — ${weaponSpecialCooldownTimer.toFixed(1)} s` : ''}`
+      : 'Equipe a Espada Doom ou a Greatsword para usar a habilidade';
+  }
   if (!weaponAbilityIndicatorsElement) return;
   weaponAbilityIndicatorsElement.hidden = !isTrackedSword;
   if (!isTrackedSword) return;
@@ -5461,10 +5472,24 @@ function closeShopMenu(resumeGame = true) {
 }
 
 function enablePointerLock() {
+  if (isTouchDevice) return;
   renderer.domElement.requestPointerLock?.();
 }
 
+function enterGameFullscreen() {
+  if (document.fullscreenElement) return;
+  if (!document.documentElement.requestFullscreen) {
+    showGameNotification('Tela cheia não disponível neste navegador.', 'info');
+    return;
+  }
+  document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch((error) => {
+    console.warn('Não foi possível entrar em tela cheia.', error);
+    showGameNotification('Toque no menu do navegador para ativar tela cheia.', 'info');
+  });
+}
+
 function startGame() {
+  enterGameFullscreen();
   gameStarted = true;
   hideScreen(mainMenuElement);
   showScreen(gameUiElement);
@@ -5709,10 +5734,11 @@ buildEnhancedFire();
 
 /* ---------- Entradas ---------- */
 renderer.domElement.addEventListener('click', () => {
-  if (gameStarted && !gameOver && !controlsEnabled) enablePointerLock();
+  if (!isTouchDevice && gameStarted && !gameOver && !controlsEnabled) enablePointerLock();
 });
 
 document.addEventListener('pointerlockchange', () => {
+  if (isTouchDevice) return;
   controlsEnabled = document.pointerLockElement === renderer.domElement;
   if (!controlsEnabled && gameStarted && !gameOver && !paused) {
     paused = true;
@@ -5838,12 +5864,13 @@ if (isTouchDevice) {
   const sprintButton = document.getElementById('touch-sprint-button');
   const shopButton = document.getElementById('touch-shop-button');
   const menuButton = document.getElementById('touch-menu-button');
-  const chestButton = document.getElementById('touch-chest-button');
+  const interactButton = document.getElementById('touch-interact-button');
 
-  chestButton?.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    if (gameStarted && !gameOver && !paused) interactWithChest();
-  }, { passive: false });
+  interactButton?.addEventListener('click', () => {
+    if (!gameStarted || gameOver || paused) return;
+    if (npcNear() || scientistNear() || frogNear()) talkNpc();
+    else interactWithChest();
+  });
 
   let joystickTouchId = null;
   const joystickRadius = 55;
@@ -5901,7 +5928,7 @@ if (isTouchDevice) {
   }, { passive: false });
 
   lookZone?.addEventListener('touchmove', (e) => {
-    if (paused || gameOver || !controlsEnabled) return;
+    if (paused || gameOver || (!isTouchDevice && !controlsEnabled)) return;
     for (const touch of e.changedTouches) {
       if (touch.identifier !== lookTouchId) continue;
       const dx = touch.clientX - lastLookX;
@@ -5935,7 +5962,8 @@ if (isTouchDevice) {
 
   specialButton?.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    doomAreaAttack();
+    if (currentWeaponId === 'doomSword') doomAreaAttack();
+    else if (currentWeaponId === 'greatsword') castGreatswordWave();
   }, { passive: false });
 
   reloadButton?.addEventListener('touchstart', (e) => {
@@ -6085,16 +6113,29 @@ function npcNear() { return !!doomguyNpc && doomguyNpc.position.distanceTo(playe
 function scientistNear() { return !!scientistNpc && scientistNpc.position.distanceTo(player.position) <= 7.5; }
 function frogNear() { return !!secretFrog && !frogDead && secretFrog.position.distanceTo(player.position) <= 7.5; }
 function refreshNpcUI() {
-  const prompt = document.getElementById('npc-prompt'); if (!prompt) return;
+  const prompt = document.getElementById('npc-prompt');
   const nearbyNpcs = [];
-  if (npcNear() && !questDone) nearbyNpcs.push({ name: 'Doom Guy', distance: doomguyNpc.position.distanceTo(player.position) });
-  if (scientistNear()) nearbyNpcs.push({ name: 'Soldado', distance: scientistNpc.position.distanceTo(player.position) });
-  if (frogNear()) nearbyNpcs.push({ name: 'Sapo', prompt: 'Pressione Q para ouvir o sapo', distance: secretFrog.position.distanceTo(player.position) });
+  if (gameStarted && !gameOver && !paused) {
+    if (npcNear() && !questDone) nearbyNpcs.push({ name: 'Doom Guy', distance: doomguyNpc.position.distanceTo(player.position) });
+    if (scientistNear()) nearbyNpcs.push({ name: 'Soldado', distance: scientistNpc.position.distanceTo(player.position) });
+    if (frogNear()) nearbyNpcs.push({ name: 'Sapo', prompt: 'Pressione Q para ouvir o sapo', distance: secretFrog.position.distanceTo(player.position) });
+  }
   nearbyNpcs.sort((a, b) => a.distance - b.distance);
-  prompt.textContent = nearbyNpcs.length
-    ? nearbyNpcs[0].prompt || `Pressione Q para falar com ${nearbyNpcs[0].name}`
-    : '';
-  prompt.classList.toggle('show', nearbyNpcs.length > 0);
+  if (prompt) {
+    prompt.textContent = nearbyNpcs.length
+      ? nearbyNpcs[0].prompt || `Pressione Q para falar com ${nearbyNpcs[0].name}`
+      : '';
+    prompt.classList.toggle('show', nearbyNpcs.length > 0);
+  }
+  const nearbyChest = gameStarted && !gameOver && !paused && getNearbyChest();
+  const interactButton = document.getElementById('touch-interact-button');
+  if (interactButton) {
+    const actor = nearbyNpcs[0];
+    interactButton.textContent = actor
+      ? actor.name === 'Sapo' ? 'OUVIR SAPO' : `FALAR · ${actor.name.toUpperCase()}`
+      : nearbyChest ? 'ABRIR BAÚ' : 'INTERAGIR';
+    interactButton.classList.toggle('visible', Boolean(actor || nearbyChest));
+  }
 }
 function closeNpcDialog() {
   document.getElementById('npc-dialog').classList.remove('show');
@@ -6438,7 +6479,6 @@ function animate() {
     updateTimedItems(delta);
     const nearbyChest = getNearbyChest();
     document.getElementById('forest-chest-prompt')?.classList.toggle('visible', Boolean(nearbyChest));
-    document.getElementById('touch-chest-button')?.classList.toggle('visible', Boolean(nearbyChest));
     drawForestMinimap();
     updateMuzzleFlashes(delta);
     updateEnemyProjectiles(delta);
