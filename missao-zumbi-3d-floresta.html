@@ -51,7 +51,7 @@
           <li><span class="key">F</span><span>Abrir 2 baús a cada 5 ondas</span></li>
           <li><span class="key">Esc</span><span>Pausar / Configurações</span></li>
         </ul>
-        <p class="briefing-note">Zumbis deixam <strong>sucata</strong>; concluir cada onda também garante um bônus crescente. A cada 3 ondas, um novo tipo de zumbi se junta à horda; os tipos já desbloqueados continuam aparecendo. O Zumbi Fúngico deixa esporos: saia da nuvem antes de 2 segundos. Kits médicos removem o veneno. A cada 5 ondas aparecem 2 baús: abra-os com F para encontrar recompensas ou um Mimic. Cuidado com as marcas vermelhas do Jardineiro.</p>
+        <p class="briefing-note">Zumbis deixam <strong>sucata</strong>; concluir cada onda também garante um bônus crescente. A cada 3 ondas, um novo tipo de zumbi se junta à horda; os tipos já desbloqueados continuam aparecendo. O Zumbi Operário avisa antes de investir: desvie e use obstáculos para atordoá-lo. O Zumbi Fúngico deixa esporos: saia da nuvem rapidamente; o veneno dura 30 segundos, mas kits médicos o removem. Munição de armas só aparece depois que a arma é desbloqueada. A cada 5 ondas aparecem 2 baús: abra-os com F para encontrar recompensas ou um Mimic. Cuidado com as marcas vermelhas do Jardineiro.</p>
       </div>
       <div class="hazard-bar bottom"></div>
     </div>
@@ -64,39 +64,45 @@
       <p>Ganhe sucata eliminando zumbis e ao concluir ondas. Planeje compras: melhorias ficam mais caras a cada nível.</p>
       <p class="shop-scrap">Sucata disponível: <strong id="shop-scrap-value">0</strong></p>
       <div class="shop-items">
+        <h3 class="shop-category-title">Arsenal</h3>
         <div class="shop-item">
           <div class="shop-item-info">
             <strong>Magnum</strong>
             <span class="shop-item-detail">Revólver de dano alto e tiro pesado — tecla 4</span>
           </div>
-          <button id="buy-shotgun" class="btn btn-secondary btn-small">Comprar (85 sucata)</button>
+          <button id="buy-shotgun" class="btn btn-secondary btn-small">Comprar (150 sucata)</button>
         </div>
         <div class="shop-item">
           <div class="shop-item-info">
             <strong>12</strong>
             <span class="shop-item-detail">Oito projéteis por disparo, ótima de perto — tecla 3</span>
           </div>
-          <button id="buy-shotgun12" class="btn btn-secondary btn-small">Comprar (70 sucata)</button>
+          <button id="buy-shotgun12" class="btn btn-secondary btn-small">Comprar (500 sucata)</button>
         </div>
         <div class="shop-item">
           <div class="shop-item-info">
             <strong>Submetralhadora</strong>
             <span class="shop-item-detail">Cadência rápida; segure o clique para disparar — tecla 5</span>
           </div>
-          <button id="buy-smg" class="btn btn-secondary btn-small">Comprar (100 sucata)</button>
+          <button id="buy-smg" class="btn btn-secondary btn-small">Comprar (250 sucata)</button>
         </div>
         <div class="shop-item">
           <div class="shop-item-info">
             <strong>Rifle de Precisão</strong>
             <span class="shop-item-detail">Dano alto e tiro lento; munição limitada — tecla 6</span>
           </div>
-          <button id="buy-rifle" class="btn btn-secondary btn-small">Comprar (135 sucata)</button>
+          <button id="buy-rifle" class="btn btn-secondary btn-small">Comprar (325 sucata)</button>
         </div>
-        <div class="shop-item"><div class="shop-item-info"><strong>Kit médico</strong><span class="shop-item-detail">Recupera 3 pontos de vida e remove o veneno</span></div><button id="buy-life" class="btn btn-secondary btn-small">Comprar (15 sucata)</button></div>
-        <div class="shop-item"><div class="shop-item-info"><strong>Colete reforçado</strong><span class="shop-item-detail">+2 de vida máxima e cura 2 (máximo: 20)</span></div><button id="buy-vest" class="btn btn-secondary btn-small">Comprar (45 sucata)</button></div>
-        <div class="shop-item"><div class="shop-item-info"><strong>Munição avulsa</strong><span class="shop-item-detail">Até duas recargas, conforme o espaço na reserva</span></div><button id="buy-ammo" class="btn btn-secondary btn-small">Comprar (12 sucata)</button></div>
-        <div class="shop-item"><div class="shop-item-info"><strong>Recarga rápida</strong><span class="shop-item-detail">Reduz o tempo de recarga em 0,25 s (até 3 níveis)</span></div><button id="buy-reload-perk" class="btn btn-secondary btn-small">Comprar (55 sucata)</button></div>
-        <div class="shop-item"><div class="shop-item-info"><strong>Instinto selvagem</strong><span class="shop-item-detail">Tiros na cabeça recuperam 1 de vida por nível (até 3)</span></div><button id="buy-lifesteal-perk" class="btn btn-secondary btn-small">Comprar (65 sucata)</button></div>
+        <h3 class="shop-category-title">Suprimentos</h3>
+        <div class="shop-item"><div class="shop-item-info"><strong>Kit médico</strong><span class="shop-item-detail">Recupera 3 pontos de vida e remove o veneno</span></div><button id="buy-life" class="btn btn-secondary btn-small">Comprar (150 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Colete reforçado</strong><span class="shop-item-detail">+2 de vida máxima e cura 2 (máximo: 20)</span></div><button id="buy-vest" class="btn btn-secondary btn-small">Comprar (200 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Munição avulsa</strong><span class="shop-item-detail">Até duas recargas da arma equipada</span></div><button id="buy-ammo" class="btn btn-secondary btn-small">Comprar (100 sucata)</button></div>
+        <h3 class="shop-category-title">Melhorias da partida</h3>
+        <div class="shop-item"><div class="shop-item-info"><strong>Recarga rápida</strong><span class="shop-item-detail">Reduz o tempo de recarga em 0,25 s por nível (até 3); +30 sucata por nível</span></div><button id="buy-reload-perk" class="btn btn-secondary btn-small">Comprar (200 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Instinto selvagem</strong><span class="shop-item-detail">Tiros na cabeça recuperam 1 de vida por nível (até 3); +30 sucata por nível</span></div><button id="buy-lifesteal-perk" class="btn btn-secondary btn-small">Comprar (250 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Impacto letal</strong><span class="shop-item-detail">Aumenta o dano das armas em 15% por nível (até 3); +30 sucata por nível</span></div><button id="buy-damage-perk" class="btn btn-secondary btn-small">Comprar (300 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Passos ligeiros</strong><span class="shop-item-detail">Aumenta a velocidade de movimento em 8% por nível (até 3); +30 sucata por nível</span></div><button id="buy-speed-perk" class="btn btn-secondary btn-small">Comprar (300 sucata)</button></div>
+        <div class="shop-item"><div class="shop-item-info"><strong>Catador experiente</strong><span class="shop-item-detail">Recebe +2 sucatas por zumbi eliminado por nível (até 3); +30 sucata por nível</span></div><button id="buy-scavenger-perk" class="btn btn-secondary btn-small">Comprar (300 sucata)</button></div>
       </div>
       <p class="settings-help">Troque de arma com as teclas 1 (canivete), 2 (pistola), 3 (12), 4 (magnum), 5 (submetralhadora), 6 (rifle), 7 (lança-granadas) e 9 (greatsword).</p>
       <button id="close-shop-button" class="btn btn-secondary">Voltar</button>
@@ -123,6 +129,11 @@
       </div>
     </div>
     <div id="game-notification" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="jumper-grapple-prompt" role="status" aria-live="assertive" aria-atomic="true">
+      <strong>ZUMBI PULADOR TE AGARROU!</strong>
+      <span id="jumper-grapple-instruction"></span>
+      <div class="jumper-grapple-meter"><div id="jumper-grapple-progress"></div></div>
+    </div>
 
     <div id="damage-vignette" aria-hidden="true"></div>
   <div id="heal-vignette" aria-hidden="true"></div>
@@ -133,7 +144,9 @@
     <h2 id="forest-wave-banner-title">ONDA 1</h2>
     <p id="forest-wave-banner-sub">Sobreviva à horda</p>
   </div>
-  <canvas id="forest-minimap" width="150" height="150"></canvas>
+  <div id="forest-map-panel">
+    <canvas id="forest-minimap" width="150" height="150" aria-label="Minimapa com limites do mapa, zumbis, munição e kits médicos"></canvas>
+  </div>
   <div id="forest-combat-feedback"></div>
 
     <div id="hud">

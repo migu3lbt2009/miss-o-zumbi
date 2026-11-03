@@ -7,8 +7,20 @@ import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js';
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x102116, 0.0088);
+const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
 const loader = new THREE.TextureLoader();
+let muzzleFlashTexture = null;
+loader.load(
+  'fotos/interface/faisca de dsiparo.png',
+  (texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.premultiplyAlpha = false;
+    muzzleFlashTexture = texture;
+  },
+  undefined,
+  (error) => console.error('Falha ao carregar o efeito de disparo (fotos/interface/faisca de dsiparo.png).', error)
+);
 
 /* ---------- Texturas ---------- */
 let treeTexture = null;
@@ -21,7 +33,7 @@ let rockTexture = null;
 let bushTexture = null;
 let fireTexture = null;
 const pickupTextures = { pistol: null, shotgun: null, shotgun12: null, rifle: null, smg: null, grenadeLauncher: null, medkit: null, scrap: null, greatsword: null };
-const enemyTextures = { walker: null, rusher: null, dodger: null, tank: null, bloater: null, fungus: null, jumper: null, mimic: null, boss: null, rootBoss: null, entity: null, parasiteBoss: null, parasite: null, infectedParasite: null, necromancer: null, necromancerBoss: null, skeleton: null, wolf: null, werewolf: null, wolf_minion: null, shooter: null, npc: null };
+const enemyTextures = { walker: null, rusher: null, dodger: null, tank: null, bloater: null, fungus: null, jumper: null, operator: null, mimic: null, boss: null, rootBoss: null, entity: null, parasiteBoss: null, parasite: null, infectedParasite: null, necromancer: null, necromancerBoss: null, skeleton: null, wolf: null, werewolf: null, wolf_minion: null, shooter: null, npc: null };
 let necromancerProjectileTexture = null;
 const localForestTextures = {
   walker: 'fotos/zumbis/zumbi-normal.png',
@@ -31,6 +43,7 @@ const localForestTextures = {
   bloater: 'fotos/zumbis/zumbi-explode.png',
   fungus: 'fotos/zumbis/Abominação Fúngica Pixelada.png',
   jumper: 'fotos/zumbis/zumbi que pula.png',
+  operator: 'fotos/zumbis/operario.png',
   mimic: 'fotos/chefes/mini chefe Mimic.webp',
   shooter: 'fotos/zumbis/zumbi-acido_atirador.png',
   boss: 'fotos/chefes/chefe-textura.png',
@@ -337,12 +350,12 @@ function playOneShot(baseAudio, volumeMultiplier = 1) {
 }
 
 /* ---------- Estado geral ---------- */
-const SHOP_PRICES = { magnum: 85, shotgun12: 70, smg: 100, rifle: 135, heal: 15, ammo: 12, vest: 45, reload: 55, lifesteal: 65 };
+const SHOP_PRICES = { magnum: 150, shotgun12: 500, smg: 250, rifle: 325, heal: 150, ammo: 100, vest: 200, reload: 200, lifesteal: 250, damage: 300, speed: 300, scavenger: 300 };
 const weaponDefs = {
   pistol: { id: 'pistol', name: 'Pistola', damage: 2.4, clipSize: 8, fireCooldown: 0.50, auto: false, cost: 0, key: '2' },
   knife: { id: 'knife', name: 'Canivete', damage: 5, clipSize: 999, fireCooldown: 0.35, auto: false, cost: 0, key: '1', melee: true, meleeRange: 4.6, meleeAngle: 0.35 },
   shotgun: { id: 'shotgun', name: 'Magnum', damage: 10.2, clipSize: 6, fireCooldown: 0.75, auto: false, cost: SHOP_PRICES.magnum, key: '4' },
-  shotgun12: { id: 'shotgun12', name: '12', damage: 0.90, clipSize: 4, fireCooldown: 0.70, auto: false, cost: SHOP_PRICES.shotgun12, key: '3', pellets: 8, spread: 0.20 },
+  shotgun12: { id: 'shotgun12', name: '12', damage: 1.35, clipSize: 4, fireCooldown: 0.70, auto: false, cost: SHOP_PRICES.shotgun12, key: '3', pellets: 8, spread: 0.17 },
   smg: { id: 'smg', name: 'Submetralhadora', damage: 2.12, clipSize: 30, fireCooldown: 0.09, auto: true, cost: SHOP_PRICES.smg, key: '5' },
   rifle: { id: 'rifle', name: 'Rifle de Precisão', damage: 13.2, clipSize: 5, fireCooldown: 1.10, auto: false, cost: SHOP_PRICES.rifle, key: '6' },
   grenadeLauncher: { id: 'grenadeLauncher', name: 'Lança-granadas', damage: 110, clipSize: 8, fireCooldown: 0.9, auto: false, key: '7' },
@@ -386,7 +399,7 @@ let poisonExposure = 0;
 let currentWave = 1;
 let enemiesThisWave = 0;
 let enemiesToSpawnThisWave = 0;
-let maxActiveEnemies = 100;
+let maxActiveEnemies = isTouchDevice ? 42 : 100;
 let bossThisWave = false;
 let bossSpawned = false;
 let score = 0;
@@ -396,6 +409,9 @@ let bestWave = Number(localStorage.getItem('forestBestWave') || 0);
 let vestLevel = 0;
 let reloadPerkLevel = 0;
 let lifestealLevel = 0;
+let damagePerkLevel = 0;
+let speedPerkLevel = 0;
+let scavengerPerkLevel = 0;
 let itemSpawnTimer = 0;
 let nextItemAt = 42;
 const forestPerks = { reload: 0.25, lifesteal: 1 };
@@ -434,6 +450,9 @@ const bossHealthValueElement = document.getElementById('boss-health-value');
 const bossHealthBarElement = document.getElementById('boss-health-bar');
 const bossHealthFillElement = document.getElementById('boss-health-fill');
 const gameNotificationElement = document.getElementById('game-notification');
+const jumperGrapplePromptElement = document.getElementById('jumper-grapple-prompt');
+const jumperGrappleInstructionElement = document.getElementById('jumper-grapple-instruction');
+const jumperGrappleProgressElement = document.getElementById('jumper-grapple-progress');
 const messageElement = document.getElementById('message');
 const ammoIndicatorElement = document.getElementById('ammo-indicator');
 const weaponAbilityIndicatorsElement = document.getElementById('weapon-ability-indicators');
@@ -451,6 +470,9 @@ const buyVestButton = document.getElementById('buy-vest');
 const buyAmmoButton = document.getElementById('buy-ammo');
 const buyReloadPerkButton = document.getElementById('buy-reload-perk');
 const buyLifestealPerkButton = document.getElementById('buy-lifesteal-perk');
+const buyDamagePerkButton = document.getElementById('buy-damage-perk');
+const buySpeedPerkButton = document.getElementById('buy-speed-perk');
+const buyScavengerPerkButton = document.getElementById('buy-scavenger-perk');
 const shopScrapValueElement = document.getElementById('shop-scrap-value');
 const resumeButton = document.getElementById('resume-button');
 const restartButton = document.getElementById('restart-button');
@@ -466,9 +488,9 @@ const effectsVolumeValueElement = document.getElementById('effects-volume-value'
 /* ---------- Renderer / câmera ---------- */
 const sizes = { width: window.innerWidth, height: window.innerHeight };
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: !isTouchDevice, powerPreference: 'high-performance' });
 renderer.setSize(sizes.width, sizes.height);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.25 : 2));
 renderer.setClearColor(0x0e150e);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -500,6 +522,9 @@ loader.load('fotos/cenario/lua.png', (texture) => {
 
 let pitch = 0;
 let yaw = 0;
+let targetPitch = 0;
+let targetYaw = 0;
+const CAMERA_LOOK_SMOOTHING = 0.045;
 let controlsEnabled = false;
 let pointerSensitivity = 0.0025;
 let soundVolume = 0.75;
@@ -1747,13 +1772,24 @@ function createWeaponMesh(weaponId) {
       rifle: { w: 1.82, h: 0.94, pos: [0, 0, -1.20], rot: [0, 0, 0] },
       doomSword: { w: 1.85, h: 2.3, pos: [0.28, -0.22, -1.12], rot: [0, 0, 0] },
       greatsword: { w: 1.42, h: 2.9, pos: [0.24, -0.04, -1.15], rot: [0, 0, 0] },
-      grenadeLauncher: { w: 2.6, h: 2.0, pos: [0.02, 0.16, -1.18], rot: [0, 0, 0] },
+      // Lança-granadas menor e mais discreto no HUD; o sprite transparente evita um retângulo de fundo.
+      grenadeLauncher: { w: 1.62, h: 1.18, pos: [0.06, -0.02, -1.16], rot: [0, 0, 0] },
     };
     const layout = layouts[weaponId] || layouts.pistol;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(layout.w, layout.h), material);
     mesh.position.set(layout.pos[0], layout.pos[1] - 0.48, layout.pos[2]);
     mesh.rotation.set(...layout.rot);
     mesh.userData.basePosition = mesh.position.clone();
+    const muzzleOffsets = {
+      pistol: [0, 0.02, -0.06],
+      shotgun: [0, 0.32, -0.06],
+      shotgun12: [0, 0.31, -0.06],
+      smg: [0.18, 0.02, -0.06],
+      rifle: [0, 0.3, -0.06],
+      grenadeLauncher: [0, 0, -0.06]
+    };
+    const muzzleOffset = muzzleOffsets[weaponId] || [0, 0, -0.06];
+    mesh.userData.muzzlePosition = new THREE.Vector3(...muzzleOffset);
     return mesh;
   }
   const shapeByWeapon = {
@@ -1900,9 +1936,12 @@ function updateShopButtons() {
     buyRifleButton.disabled = owned;
   }
   if (shopScrapValueElement) shopScrapValueElement.textContent = `${scrap}`;
-  const vestPrice = SHOP_PRICES.vest + vestLevel * 15;
-  const reloadPrice = SHOP_PRICES.reload + reloadPerkLevel * 25;
+  const vestPrice = SHOP_PRICES.vest + vestLevel * 30;
+  const reloadPrice = SHOP_PRICES.reload + reloadPerkLevel * 30;
   const lifestealPrice = SHOP_PRICES.lifesteal + lifestealLevel * 30;
+  const damagePrice = SHOP_PRICES.damage + damagePerkLevel * 30;
+  const speedPrice = SHOP_PRICES.speed + speedPerkLevel * 30;
+  const scavengerPrice = SHOP_PRICES.scavenger + scavengerPerkLevel * 30;
   if (buyLifeButton) {
     buyLifeButton.textContent = `Comprar (${SHOP_PRICES.heal} sucata)`;
     buyLifeButton.disabled = scrap < SHOP_PRICES.heal || (playerHealth >= maxPlayerHealth && poisonDuration <= 0);
@@ -1916,14 +1955,18 @@ function updateShopButtons() {
     buyAmmoButton.textContent = `Comprar (${SHOP_PRICES.ammo} sucata)`;
     buyAmmoButton.disabled = scrap < SHOP_PRICES.ammo || weapon.melee || getCurrentReserveAmmo() >= getReserveAmmoLimit(currentWeaponId);
   }
-  if (buyReloadPerkButton) {
-    buyReloadPerkButton.textContent = reloadPerkLevel >= 3 ? 'Nível máximo' : `Comprar (${reloadPrice} sucata)`;
-    buyReloadPerkButton.disabled = scrap < reloadPrice || reloadPerkLevel >= 3;
-  }
-  if (buyLifestealPerkButton) {
-    buyLifestealPerkButton.textContent = lifestealLevel >= 3 ? 'Nível máximo' : `Comprar (${lifestealPrice} sucata)`;
-    buyLifestealPerkButton.disabled = scrap < lifestealPrice || lifestealLevel >= 3;
-  }
+  const perkButtons = [
+    [buyReloadPerkButton, reloadPerkLevel, reloadPrice],
+    [buyLifestealPerkButton, lifestealLevel, lifestealPrice],
+    [buyDamagePerkButton, damagePerkLevel, damagePrice],
+    [buySpeedPerkButton, speedPerkLevel, speedPrice],
+    [buyScavengerPerkButton, scavengerPerkLevel, scavengerPrice],
+  ];
+  perkButtons.forEach(([button, level, price]) => {
+    if (!button) return;
+    button.textContent = level >= 3 ? 'Nível máximo' : `Comprar (${price} sucata)`;
+    button.disabled = scrap < price || level >= 3;
+  });
 }
 
 buyShotgunButton?.addEventListener('click', () => buyWeapon('shotgun'));
@@ -1942,7 +1985,7 @@ buyLifeButton?.addEventListener('click', () => {
   if (curedPoison) showGameNotification('Kit médico: veneno removido e vida recuperada.', 'reward');
 });
 buyVestButton?.addEventListener('click', () => {
-  const price = SHOP_PRICES.vest + vestLevel * 15;
+  const price = SHOP_PRICES.vest + vestLevel * 30;
   if (scrap < price || maxPlayerHealth >= MAX_PLAYER_HEALTH) return;
   scrap -= price; vestLevel += 1; maxPlayerHealth = Math.min(MAX_PLAYER_HEALTH, maxPlayerHealth + 2); playerHealth = Math.min(maxPlayerHealth, playerHealth + 2); playOneShot(localGameSounds.purchase, 0.9); updateHealthDisplay(); updateScrapDisplay(); updateShopButtons();
 });
@@ -1952,7 +1995,7 @@ buyAmmoButton?.addEventListener('click', () => {
   scrap -= SHOP_PRICES.ammo; reserveAmmoByWeapon[currentWeaponId] = Math.min(getReserveAmmoLimit(currentWeaponId), getCurrentReserveAmmo() + weapon.clipSize * 2); playOneShot(localGameSounds.purchase, 0.9); updateAmmoDisplay(); updateScrapDisplay(); updateShopButtons();
 });
 buyReloadPerkButton?.addEventListener('click', () => {
-  const price = SHOP_PRICES.reload + reloadPerkLevel * 25;
+  const price = SHOP_PRICES.reload + reloadPerkLevel * 30;
   if (scrap < price || reloadPerkLevel >= 3) return;
   scrap -= price; reloadPerkLevel += 1; reloadDuration = Math.max(0.7, reloadDuration - forestPerks.reload); playOneShot(localGameSounds.purchase, 0.9); updateScrapDisplay(); updateShopButtons();
 });
@@ -1960,6 +2003,35 @@ buyLifestealPerkButton?.addEventListener('click', () => {
   const price = SHOP_PRICES.lifesteal + lifestealLevel * 30;
   if (scrap < price || lifestealLevel >= 3) return;
   scrap -= price; lifestealLevel += 1; playOneShot(localGameSounds.purchase, 0.9); updateScrapDisplay(); updateShopButtons();
+});
+buyDamagePerkButton?.addEventListener('click', () => {
+  const price = SHOP_PRICES.damage + damagePerkLevel * 30;
+  if (scrap < price || damagePerkLevel >= 3) return;
+  scrap -= price;
+  damagePerkLevel += 1;
+  damageMultiplier *= 1.15;
+  playOneShot(localGameSounds.purchase, 0.9);
+  updateScrapDisplay();
+  updateShopButtons();
+});
+buySpeedPerkButton?.addEventListener('click', () => {
+  const price = SHOP_PRICES.speed + speedPerkLevel * 30;
+  if (scrap < price || speedPerkLevel >= 3) return;
+  scrap -= price;
+  speedPerkLevel += 1;
+  moveSpeedMultiplier *= 1.08;
+  playOneShot(localGameSounds.purchase, 0.9);
+  updateScrapDisplay();
+  updateShopButtons();
+});
+buyScavengerPerkButton?.addEventListener('click', () => {
+  const price = SHOP_PRICES.scavenger + scavengerPerkLevel * 30;
+  if (scrap < price || scavengerPerkLevel >= 3) return;
+  scrap -= price;
+  scavengerPerkLevel += 1;
+  playOneShot(localGameSounds.purchase, 0.9);
+  updateScrapDisplay();
+  updateShopButtons();
 });
 updateShopButtons();
 
@@ -2056,9 +2128,9 @@ function playSound(frequency, duration = 0.08) {
 }
 
 /* ---------- Inimigos ---------- */
-const enemyColors = { walker: 0x4f2d2d, rusher: 0x7a0909, dodger: 0x31402d, tank: 0x2d392d, bloater: 0x8f4b20, fungus: 0x667833, jumper: 0xa8572c, boss: 0x8b0000, entity: 0x1d1b2a, shooter: 0x3a3a3a };
+const enemyColors = { walker: 0x4f2d2d, rusher: 0x7a0909, dodger: 0x31402d, tank: 0x2d392d, bloater: 0x8f4b20, fungus: 0x667833, jumper: 0xa8572c, operator: 0x77705a, boss: 0x8b0000, entity: 0x1d1b2a, shooter: 0x3a3a3a };
 const bossEnemyTypes = new Set(['boss', 'wolf', 'necromancer', 'parasiteBoss', 'electrician', 'entity', 'rootBoss']);
-const enemyTypes = ['walker', 'walker', 'walker', 'rusher', 'dodger', 'tank', 'shooter', 'bloater'];
+const enemyTypes = ['walker', 'walker', 'walker', 'rusher', 'dodger', 'tank', 'shooter', 'bloater', 'operator'];
 const bullets = [];
 const grenadeProjectiles = [];
 const enemies = [];
@@ -2087,10 +2159,15 @@ const keys = { w: false, a: false, s: false, d: false, shift: false };
 let playerVerticalVelocity = 0;
 let playerGrounded = true;
 let playerStunTimer = 0;
+const playerHorizontalVelocity = new THREE.Vector3();
+const PLAYER_MOVE_ACCELERATION = 54;
+const PLAYER_MOVE_DECELERATION = 72;
+const JUMPER_STRUGGLE_INPUTS = 6;
+const JUMPER_GRAPPLE_TIMEOUT = 6;
+let playerGrapple = null;
 const playerJumpStrength = 7.5;
 const playerGravity = 22;
 
-const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const touchMoveVector = { x: 0, z: 0 };
 let touchSprintHeld = false;
 
@@ -2151,6 +2228,7 @@ function createEnemyMesh(type) {
     else if (type === 'wolf') sprite.scale.set(5.8, 4.4, 1);
     else if (type === 'wolf_minion') sprite.scale.set(3.2, 2.4, 1);
     else if (type === 'jumper') sprite.scale.set(2.5, 2.8, 1);
+    else if (type === 'operator') sprite.scale.set(3.2, 4.2, 1);
     else if (type === 'skeleton') sprite.scale.set(2.8, 3.8, 1);
     else if (type === 'shooter') sprite.scale.set(3.6, 5.1, 1);
     else if (type === 'parasite') sprite.scale.set(2.2, 2.2, 1);
@@ -2186,7 +2264,7 @@ function getEnemyGroundY(type) {
   if (type === 'mimic') return 0.70;
   if (type === 'wolf') return 0.70;
   if (type === 'wolf_minion') return -0.30;
-  if (type === 'jumper') return -0.10;
+  if (type === 'jumper') return -0.10; // Compensa a altura do sprite e mantém o crawler apoiado no piso.
   // Sprites normais agora são maiores, mas o grupo sobe exatamente o necessário
   // para os pés continuarem encostando no chão (Y=-1.5).
   return 0.50;
@@ -2257,6 +2335,7 @@ function spawnEnemy(forceType = null, nearPosition = null, spawnOptions = {}) {
     type === 'shooter' ? 0.8 :
     type === 'dodger' ? 1.05 :
     type === 'jumper' ? 1.1 :
+    type === 'operator' ? 0.82 :
     0.9 // walker
   ) * (1 + Math.min(0.3, Math.max(0, currentWave - 15) * 0.012)) *
     (bossEnemyTypes.has(type) ? 0.8 + (bossRank - 1) * 0.08 : 1);
@@ -2273,6 +2352,7 @@ function spawnEnemy(forceType = null, nearPosition = null, spawnOptions = {}) {
     type === 'wolf_minion' ? 16 + currentWave * 2 :
     type === 'skeleton' ? 20 + currentWave * 2 :
     type === 'jumper' ? 30 + currentWave * 3 :
+    type === 'operator' ? 14 + currentWave * 0.45 :
     type === 'shooter' ? 10 + Math.floor(currentWave / 4) :
     type === 'bloater' ? 16 + currentWave * 1.8 :
     type === 'fungus' ? Math.floor(Math.random() * 4) + 11 :
@@ -2351,6 +2431,10 @@ function spawnEnemy(forceType = null, nearPosition = null, spawnOptions = {}) {
     jumpLanded: false,
     jumpCooldownTimer: 1.5 + Math.random() * 1.2,
     jumpDirection: new THREE.Vector3(),
+    operatorState: 'idle',
+    operatorTimer: 15,
+    operatorPhaseTimer: 0,
+    operatorDirection: new THREE.Vector3(),
     jumpShadow,
     sprite: enemy.isSprite ? enemy : enemy.children.find((child) => child.isSprite) || null,
     spriteBaseScale: enemy.isSprite ? enemy.scale.clone() : null,
@@ -2592,7 +2676,7 @@ const ammoPickupKinds = ['pistol', 'shotgun', 'shotgun12', 'rifle', 'smg', 'gren
 
 function randomAmmoPickupKind() {
   const availableKinds = ammoPickupKinds.filter((kind) =>
-    (kind !== 'grenadeLauncher' || unlockedWeapons.has(kind)) &&
+    unlockedWeapons.has(kind) &&
     (reserveAmmoByWeapon[kind] ?? 0) < getReserveAmmoLimit(kind)
   );
   return availableKinds.length
@@ -2601,13 +2685,14 @@ function randomAmmoPickupKind() {
 }
 
 function spawnPickupAt(position, kind, ignoreLimit = false) {
+  if (ammoPickupKinds.includes(kind) && !unlockedWeapons.has(kind)) return;
   if (pickups.length >= 10 && !ignoreLimit) return;
   const texture = pickupTextures[kind];
   let mesh;
   if (texture) {
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
     mesh = new THREE.Sprite(material);
-    const size = kind === 'grenadeLauncher' ? 1.9 : 1.4;
+    const size = kind === 'grenadeLauncher' ? 1.4 : 1.4;
     mesh.scale.set(size, size, 1);
     if (kind === 'grenadeLauncher') {
       mesh.add(new THREE.PointLight(0xffa536, 1.6, 7));
@@ -2833,23 +2918,111 @@ function updateTimedItems(delta) {
   }
 }
 
+let minimapRefreshTimer = 0;
+
 function drawForestMinimap() {
   const canvas = document.getElementById('forest-minimap');
   if (!canvas || !player) return;
   const context = canvas.getContext('2d');
-  context.clearRect(0, 0, 150, 150);
-  context.fillStyle = 'rgba(25, 66, 29, .7)';
-  context.fillRect(0, 0, 150, 150);
+  const mapSize = canvas.width;
+  const center = mapSize / 2;
   const scale = 2.4;
-  const center = 75;
+  const mapRadius = center - 2;
+  const mapLimit = 158;
+  context.clearRect(0, 0, mapSize, mapSize);
+  context.fillStyle = 'rgba(25, 66, 29, .7)';
+  context.fillRect(0, 0, mapSize, mapSize);
+
+  context.save();
+  context.beginPath();
+  context.rect(1, 1, mapSize - 2, mapSize - 2);
+  context.clip();
+  const edgeLeft = center + (-mapLimit - player.position.x) / scale;
+  const edgeRight = center + (mapLimit - player.position.x) / scale;
+  const edgeTop = center + (-mapLimit - player.position.z) / scale;
+  const edgeBottom = center + (mapLimit - player.position.z) / scale;
+  context.strokeStyle = '#ffc95e';
+  context.lineWidth = 2;
+  context.setLineDash([5, 3]);
+  context.shadowColor = 'rgba(255, 201, 94, .72)';
+  context.shadowBlur = 7;
+  context.strokeRect(edgeLeft, edgeTop, edgeRight - edgeLeft, edgeBottom - edgeTop);
+  context.setLineDash([]);
+  context.shadowBlur = 0;
+
+  const drawMapMarker = (position, radius, draw) => {
+    const x = center + (position.x - player.position.x) / scale;
+    const y = center + (position.z - player.position.z) / scale;
+    if (x < 3 || y < 3 || x > mapSize - 3 || y > mapSize - 3) return;
+    context.save();
+    context.translate(x, y);
+    draw(radius);
+    context.restore();
+  };
+
   enemies.forEach(enemy => {
-    const dx = (enemy.position.x - player.position.x) / scale;
-    const dz = (enemy.position.z - player.position.z) / scale;
-    if (Math.abs(dx) > 70 || Math.abs(dz) > 70) return;
     const isElite = bossEnemyTypes.has(enemy.userData.type) || enemy.userData.type === 'mimic';
-    context.fillStyle = isElite ? '#ffcf55' : '#e85b4f';
-    context.beginPath(); context.arc(center + dx, center + dz, isElite ? 5 : 3, 0, Math.PI * 2); context.fill();
+    drawMapMarker(enemy.position, isElite ? 5 : 3, (radius) => {
+      context.fillStyle = isElite ? '#ffcf55' : '#e85b4f';
+      context.shadowColor = isElite ? 'rgba(255, 207, 85, .85)' : 'rgba(232, 91, 79, .55)';
+      context.shadowBlur = isElite ? 7 : 3;
+      context.beginPath();
+      context.arc(0, 0, radius, 0, Math.PI * 2);
+      context.fill();
+    });
   });
+  pickups.forEach((pickup) => {
+    const kind = pickup.userData.kind;
+    if (kind === 'medkit') {
+      drawMapMarker(pickup.position, 5, () => {
+        context.fillStyle = '#8fef4d';
+        context.fillRect(-4, -4, 8, 8);
+        context.fillStyle = '#10220e';
+        context.fillRect(-1, -3, 2, 6);
+        context.fillRect(-3, -1, 6, 2);
+      });
+    } else if (ammoPickupKinds.includes(kind)) {
+      drawMapMarker(pickup.position, 5, () => {
+        context.fillStyle = '#1687a5';
+        context.strokeStyle = '#68dcff';
+        context.lineWidth = 1.5;
+        context.fillRect(-4, -4, 8, 8);
+        context.strokeRect(-4, -4, 8, 8);
+        context.fillStyle = '#e9fbff';
+        context.fillRect(-2, -2, 1, 4);
+        context.fillRect(1, -2, 1, 4);
+      });
+    } else if (kind === 'greatsword') {
+      drawMapMarker(pickup.position, 5, () => {
+        context.fillStyle = '#d6a4ff';
+        context.beginPath();
+        context.moveTo(0, -5);
+        context.lineTo(5, 0);
+        context.lineTo(0, 5);
+        context.lineTo(-5, 0);
+        context.closePath();
+        context.fill();
+      });
+    }
+  });
+  chests.forEach((chest) => {
+    if (!chest.opened) {
+      drawMapMarker(chest.position, 5, () => {
+        context.fillStyle = '#ffc95e';
+        context.fillRect(-4, -3, 8, 6);
+        context.strokeStyle = '#fff0a8';
+        context.lineWidth = 1;
+        context.strokeRect(-4, -3, 8, 6);
+        context.fillStyle = '#75451d';
+        context.fillRect(-1, -1, 2, 3);
+      });
+    }
+  });
+  context.restore();
+
+  context.strokeStyle = 'rgba(190, 255, 130, .72)';
+  context.lineWidth = 1;
+  context.strokeRect(0.5, 0.5, mapSize - 1, mapSize - 1);
   context.save();
   context.translate(center, center);
   context.rotate(-player.rotation.y);
@@ -3017,6 +3190,7 @@ function getWaveEnemyType(wave) {
     ['fungus', 18, 2.2 + postWavePressure * 0.04],
     ['jumper', 21, 2.5 + postWavePressure * 0.05],
     ['wolf_minion', 24, Math.min(3.5, 1.1 + postWavePressure * 0.08)],
+    ['operator', 15, 1.4 + postWavePressure * 0.05],
   ];
   const available = weights
     .filter(([, unlockWave]) => wave >= unlockWave)
@@ -3194,16 +3368,34 @@ function meleeAttack(weapon) {
 
 }
 
-function spawnMuzzleFlash() {
-  const flashLight = new THREE.PointLight(0xfff1b8, 3.2, 7, 2);
-  flashLight.position.set(0.35, -0.35, -0.6);
-  camera.add(flashLight);
+function getWeaponMuzzlePosition() {
+  const muzzle = playerGun.userData.muzzlePosition
+    ? playerGun.userData.muzzlePosition.clone()
+    : new THREE.Vector3(0, 0, -(playerGun.geometry.parameters.depth || 0.7) / 2);
+  return playerGun.localToWorld(muzzle);
+}
 
-  const flashMaterial = new THREE.SpriteMaterial({ color: 0xfff1b8, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthTest: false });
-  const flashSprite = new THREE.Sprite(flashMaterial);
-  flashSprite.scale.set(0.55, 0.55, 1);
-  flashSprite.position.set(0.35, -0.35, -0.65);
-  camera.add(flashSprite);
+function spawnMuzzleFlash(position) {
+  const flashLight = new THREE.PointLight(0xfff1b8, 3.2, 7, 2);
+  flashLight.position.copy(position);
+  scene.add(flashLight);
+
+  let flashSprite = null;
+  if (muzzleFlashTexture) {
+    const flashMaterial = new THREE.SpriteMaterial({
+      map: muzzleFlashTexture,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false
+    });
+    flashSprite = new THREE.Sprite(flashMaterial);
+    flashSprite.scale.set(0.48, 0.31, 1);
+    flashSprite.position.copy(position);
+    flashSprite.renderOrder = 20;
+    scene.add(flashSprite);
+  }
 
   muzzleFlashes.push({ light: flashLight, sprite: flashSprite, life: 0.06, maxLife: 0.06 });
 }
@@ -3247,12 +3439,15 @@ function shoot() {
   weaponRecoil += weapon.melee ? 0.025 : 0.09;
   updateAmmoDisplay();
   playOneShot(weapon.id === 'shotgun12' ? localGameSounds.shotHeavy : localGameSounds.shot, weapon.id === 'smg' ? 0.24 : 0.28);
-  spawnMuzzleFlash();
 
-  const origin = new THREE.Vector3();
+  const cameraOrigin = new THREE.Vector3();
   const baseDirection = new THREE.Vector3();
-  camera.getWorldPosition(origin);
+  camera.getWorldPosition(cameraOrigin);
   camera.getWorldDirection(baseDirection).normalize();
+  const aimPoint = cameraOrigin.clone().addScaledVector(baseDirection, 100);
+  const origin = getWeaponMuzzlePosition();
+  baseDirection.copy(aimPoint.sub(origin).normalize());
+  spawnMuzzleFlash(origin);
 
   if (weapon.id === 'grenadeLauncher') {
     const grenade = new THREE.Mesh(
@@ -3281,18 +3476,44 @@ function shoot() {
       direction.z += (Math.random() - 0.5) * weapon.spread;
       direction.normalize();
     }
-    const bulletGeometry = new THREE.SphereGeometry(0.14, 8, 8);
-    const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xfff6d0 });
-    const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-    bullet.position.copy(origin).add(direction.clone().multiplyScalar(1.2));
+    const bullet = new THREE.Group();
+    const bulletMaterial = new THREE.MeshBasicMaterial({
+      color: 0xfff2bf,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const tracer = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.38, 7), bulletMaterial);
+    tracer.rotation.x = Math.PI / 2;
+    bullet.add(tracer);
+
+    const bulletCore = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 6, 6),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    bulletCore.position.z = 0.12;
+    bullet.add(bulletCore);
+
+    const trail = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.04, 0.32, 6, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xff8e32,
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    trail.rotation.x = Math.PI / 2;
+    trail.position.z = -0.24;
+    bullet.add(trail);
+
+    bullet.position.copy(origin).add(direction.clone().multiplyScalar(0.12));
+    bullet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
     bullet.userData = { velocity: direction, damage: weapon.damage * damageMultiplier };
     scene.add(bullet);
     bullets.push(bullet);
-
-    // brilho sutil acompanhando o projétil
-    const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xfff6c9, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthTest: false }));
-    glowSprite.scale.set(0.4, 0.4, 1);
-    bullet.add(glowSprite);
   }
 }
 
@@ -3311,6 +3532,11 @@ function applyDamageToEnemy(enemy, index, damage, headshot = false) {
   updateBossHealthDisplay();
   if (enemy.userData.health <= 0) {
     enemy.userData.alive = false;
+    if (playerGrapple?.enemy === enemy) {
+      playerGrapple = null;
+      document.body.classList.remove('jumper-grapple');
+      if (jumperGrappleProgressElement) jumperGrappleProgressElement.style.width = '0%';
+    }
     const deathPosition = enemy.position.clone();
     const deathType = enemy.userData.type;
     if (deathType === 'mimic') {
@@ -3348,9 +3574,9 @@ function applyDamageToEnemy(enemy, index, damage, headshot = false) {
     scene.remove(enemy);
     enemies.splice(index, 1);
     updateBossHealthDisplay();
-    if (deathType === 'bloater' || deathType === 'jumper') {
+    if (deathType === 'bloater') {
       playOneShot(localGameSounds.zombieExplosion, 0.9);
-      triggerForestExplosion(deathPosition, deathType === 'jumper' ? 6.2 : 7);
+      triggerForestExplosion(deathPosition, 9.5, null, 5, 28);
     }
     if (deathType === 'shooter') {
       spawnAcidDeathSplash(deathPosition);
@@ -3380,7 +3606,7 @@ function applyDamageToEnemy(enemy, index, damage, headshot = false) {
       deathType === 'wolf' ? 18 + getBossRank(currentWave) * 4 :
       deathType === 'wolf_minion' ? 5 :
       2;
-    scrap += scrapDrop;
+    scrap += scrapDrop + scavengerPerkLevel * 2;
     if (scoreElement) scoreElement.textContent = `Pontuação: ${score}`;
     updateScrapDisplay();
     if (deathType === 'boss' && !unlockedWeapons.has('shotgun12')) {
@@ -3422,7 +3648,7 @@ function showForestCombatFeedback(text, critical = false) {
 
 const forestParticles = [];
 const necromancerDeathEffects = [];
-const maxForestParticles = 900;
+const maxForestParticles = isTouchDevice ? 320 : 900;
 const bloodBurstTypes = new Set(['walker', 'rusher', 'dodger', 'tank', 'jumper', 'boss']);
 const boneBurstTypes = new Set(['skeleton', 'wolf', 'wolf_minion']);
 
@@ -4427,12 +4653,57 @@ function updateEntityBlastEffects(delta) {
   }
 }
 
+const enemyHeadshotRegions = {
+  walker: { x: 0.52, y: 0.25, radiusX: 0.15, radiusY: 0.13 },
+  rusher: { x: 0.47, y: 0.18, radiusX: 0.13, radiusY: 0.12 },
+  dodger: { x: 0.39, y: 0.23, radiusX: 0.13, radiusY: 0.12 },
+  tank: { x: 0.46, y: 0.23, radiusX: 0.15, radiusY: 0.12 },
+  bloater: { x: 0.54, y: 0.29, radiusX: 0.15, radiusY: 0.13 },
+  fungus: { x: 0.35, y: 0.22, radiusX: 0.15, radiusY: 0.14 },
+  jumper: { x: 0.69, y: 0.17, radiusX: 0.14, radiusY: 0.12 },
+  operator: { x: 0.66, y: 0.17, radiusX: 0.14, radiusY: 0.12 },
+  shooter: { x: 0.48, y: 0.19, radiusX: 0.14, radiusY: 0.12 },
+  skeleton: { x: 0.50, y: 0.24, radiusX: 0.13, radiusY: 0.12 },
+  wolf: { x: 0.23, y: 0.39, radiusX: 0.13, radiusY: 0.12 },
+  wolf_minion: { x: 0.23, y: 0.39, radiusX: 0.13, radiusY: 0.12 },
+  parasite: { x: 0.48, y: 0.27, radiusX: 0.17, radiusY: 0.15 },
+  mimic: { x: 0.50, y: 0.22, radiusX: 0.17, radiusY: 0.14 },
+  boss: { x: 0.50, y: 0.24, radiusX: 0.16, radiusY: 0.14 },
+  rootBoss: { x: 0.34, y: 0.21, radiusX: 0.14, radiusY: 0.13 },
+  entity: { x: 0.67, y: 0.31, radiusX: 0.14, radiusY: 0.13 },
+  parasiteBoss: { x: 0.50, y: 0.23, radiusX: 0.14, radiusY: 0.13 },
+  electrician: { x: 0.50, y: 0.22, radiusX: 0.14, radiusY: 0.13 },
+  necromancer: { x: 0.50, y: 0.22, radiusX: 0.15, radiusY: 0.13 },
+};
+const defaultEnemyHeadshotRegion = { x: 0.5, y: 0.23, radiusX: 0.15, radiusY: 0.13 };
+
 function isEnemyHeadshot(enemy, position) {
-  const visual = enemy.children[0];
-  const height = visual?.isSprite
-    ? visual.scale.y
-    : visual?.geometry?.parameters?.height || 2;
-  return position.y - enemy.position.y > height * 0.2;
+  const visual = enemy.userData.sprite || enemy.children[0];
+  if (!visual) return false;
+  const region = enemyHeadshotRegions[enemy.userData.type] || defaultEnemyHeadshotRegion;
+  const center = enemy.localToWorld(visual.position.clone());
+  const cameraQuaternion = camera.getWorldQuaternion(new THREE.Quaternion());
+  const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(cameraQuaternion);
+  const horizontalDistance = position.clone().sub(center).dot(cameraRight);
+  const verticalDistance = position.y - center.y;
+  const width = visual.isSprite ? visual.scale.x : visual.geometry?.parameters?.width || 2;
+  const height = visual.isSprite ? visual.scale.y : visual.geometry?.parameters?.height || 2;
+  const headCenterX = (region.x - 0.5) * width;
+  const headCenterY = (0.5 - region.y) * height;
+  return Math.abs(horizontalDistance - headCenterX) <= region.radiusX * width &&
+    Math.abs(verticalDistance - headCenterY) <= region.radiusY * height;
+}
+
+function removeBulletAt(index) {
+  const bullet = bullets[index];
+  scene.remove(bullet);
+  bullet.traverse((part) => {
+    if (!part.isMesh) return;
+    part.geometry.dispose();
+    const materials = Array.isArray(part.material) ? part.material : [part.material];
+    materials.forEach((material) => material.dispose());
+  });
+  bullets.splice(index, 1);
 }
 
 function updateBullets(delta) {
@@ -4455,10 +4726,10 @@ function updateBullets(delta) {
       bullet.position.addScaledVector(bullet.userData.velocity, bulletSpeed);
     }
     if (pointHitsStaticCollider(bullet.position, specialWave ? 0.8 : 0.14)) {
-      scene.remove(bullet); bullets.splice(i, 1); continue;
+      removeBulletAt(i); continue;
     }
     const outOfRange = specialWave ? bullet.userData.travelled > bullet.userData.range : bullet.position.distanceTo(camera.position) > 160;
-    if (outOfRange) { scene.remove(bullet); bullets.splice(i, 1); continue; }
+    if (outOfRange) { removeBulletAt(i); continue; }
     if (secretFrog && !frogDead && !bullet.userData.hitFrog) {
       const toFrog = secretFrog.position.clone().sub(bullet.position).setY(0);
       let hitFrog = false;
@@ -4473,7 +4744,7 @@ function updateBullets(delta) {
       if (hitFrog) {
         damageSecretFrog(bullet.userData.damage || 1);
         if (specialWave) bullet.userData.hitFrog = true;
-        else { scene.remove(bullet); bullets.splice(i, 1); continue; }
+        else { removeBulletAt(i); continue; }
       }
     }
     for (let j = enemies.length - 1; j >= 0; j--) {
@@ -4492,7 +4763,7 @@ function updateBullets(delta) {
         const damage = bullet.userData.damage || 1;
         applyDamageToEnemy(enemy, j, headshot ? damage * 2 : damage, headshot);
         if (specialWave) bullet.userData.hitEnemies.add(enemy.uuid);
-        else { scene.remove(bullet); bullets.splice(i, 1); break; }
+        else { removeBulletAt(i); break; }
       }
     }
   }
@@ -4523,7 +4794,7 @@ function updateGrenadeProjectiles(delta) {
 function spawnSporeCloud(position) {
   const cloud = new THREE.Group();
   const groundHaze = new THREE.Mesh(
-    new THREE.CircleGeometry(3.2, 36),
+    new THREE.CircleGeometry(5.2, 36),
     new THREE.MeshBasicMaterial({ color: 0x7f9b36, transparent: true, opacity: 0.42, depthWrite: false })
   );
   groundHaze.rotation.x = -Math.PI / 2;
@@ -4533,7 +4804,7 @@ function spawnSporeCloud(position) {
   const wisps = [];
   for (let i = 0; i < 9; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const distance = Math.random() * 2.2;
+    const distance = Math.random() * 4.2;
     const wisp = new THREE.Mesh(
       new THREE.SphereGeometry(0.55 + Math.random() * 0.45, 10, 8),
       new THREE.MeshBasicMaterial({
@@ -4551,7 +4822,7 @@ function spawnSporeCloud(position) {
   }
 
   cloud.position.set(position.x, 0, position.z);
-  cloud.userData = { life: 5, age: 0, radius: 3.2, groundHaze, wisps };
+  cloud.userData = { life: 7, age: 0, radius: 5.2, groundHaze, wisps };
   scene.add(cloud);
   sporeClouds.push(cloud);
 }
@@ -4587,8 +4858,8 @@ function updateSporeClouds(delta) {
 
   if (poisonDuration <= 0) {
     poisonExposure = insideSpores ? poisonExposure + delta : 0;
-    if (poisonExposure >= 1.8) {
-      poisonDuration = 15;
+    if (poisonExposure >= 0.8) {
+      poisonDuration = 30;
       poisonDamageTimer = 5;
       poisonExposure = 0;
       updatePoisonStatus();
@@ -4717,6 +4988,18 @@ function updateEnemies(delta) {
     const enemy = enemies[i];
     const data = enemy.userData;
     addInfectedParasiteVisual(enemy);
+    if (playerGrapple?.enemy === enemy) {
+      const attachedDirection = new THREE.Vector3().subVectors(enemy.position, player.position).setY(0);
+      if (attachedDirection.lengthSq() < 0.01) attachedDirection.set(0, 0, 1);
+      enemy.position.copy(player.position).addScaledVector(attachedDirection.normalize(), 1.25);
+      enemy.position.y = data.groundY;
+      if (data.healthGroup) {
+        const cameraPosition = new THREE.Vector3();
+        camera.getWorldPosition(cameraPosition);
+        data.healthGroup.lookAt(cameraPosition);
+      }
+      continue;
+    }
     const previousX = enemy.position.x;
     const previousZ = enemy.position.z;
     const speed = data.speed * delta * 60 *
@@ -4771,14 +5054,16 @@ function updateEnemies(delta) {
 
         if (data.jumpLanded) {
           data.jumpLanded = false;
-          if (distanceToPlayer < 6.2) {
-            applyDamageToEnemy(enemy, i, data.health);
-            continue;
+          if (distanceToPlayer < 3.4) {
+            beginJumperGrapple(enemy);
           }
         }
-        if (!data.jumping && distanceToPlayer < 3.2) {
-          applyDamageToEnemy(enemy, i, data.health);
-          continue;
+        if (!data.jumping && distanceToPlayer < 3.2 && playerGrapple?.enemy !== enemy) {
+          data.hitCooldown = Math.max(0, (data.hitCooldown || 0) - delta);
+          if (data.hitCooldown <= 0) {
+            damagePlayer(1);
+            data.hitCooldown = 1.2;
+          }
         }
       } else if (data.type === 'parasite') {
         const targetZombie = findNearestInfectableZombie(enemy.position);
@@ -4826,6 +5111,38 @@ function updateEnemies(delta) {
           if (data.dodgeDuration <= 0) {
             data.dodging = false;
             data.dodgeTimer = 2 + Math.random() * 2.5;
+          }
+        }
+      } else if (data.type === 'operator') {
+        if (data.operatorState === 'idle') {
+          data.operatorTimer -= delta;
+          if (data.operatorTimer <= 0 && distanceToPlayer < 55) {
+            data.operatorState = 'windup';
+            data.operatorPhaseTimer = 1;
+            data.operatorDirection
+              .subVectors(player.position, enemy.position)
+              .setY(0)
+              .normalize();
+            playOneShot(localGameSounds.bruteAttack, 0.9);
+            showGameNotification('O Zumbi Operário prepara uma investida!', 'damage');
+          } else {
+            direction.multiplyScalar(0.82);
+          }
+        } else if (data.operatorState === 'windup') {
+          direction.set(0, 0, 0);
+          data.operatorPhaseTimer -= delta;
+          if (data.operatorPhaseTimer <= 0) {
+            data.operatorState = 'charging';
+            showGameNotification('O Zumbi Operário está investindo!', 'damage');
+          }
+        } else if (data.operatorState === 'charging') {
+          direction.copy(data.operatorDirection).multiplyScalar(3.2);
+        } else {
+          direction.set(0, 0, 0);
+          data.operatorPhaseTimer -= delta;
+          if (data.operatorPhaseTimer <= 0) {
+            data.operatorState = 'idle';
+            data.operatorTimer = 12;
           }
         }
       } else if (data.type === 'rusher') {
@@ -5418,10 +5735,25 @@ function updateEnemies(delta) {
         }
       }
       const nextEnemyPosition = enemy.position.clone().addScaledVector(direction, speed);
-      if (data.type !== 'jumper' || !data.jumping) {
+      if (data.type === 'operator' && data.operatorState === 'charging') {
+        const desiredPosition = nextEnemyPosition.clone();
+        resolveStaticCollisions(nextEnemyPosition, 0.95);
+        const hitObstacle = nextEnemyPosition.distanceTo(desiredPosition) > 0.12;
+        const hitBoundary = Math.abs(desiredPosition.x) > 169 || Math.abs(desiredPosition.z) > 169;
+        nextEnemyPosition.x = Math.max(-169, Math.min(169, nextEnemyPosition.x));
+        nextEnemyPosition.z = Math.max(-169, Math.min(169, nextEnemyPosition.z));
+        if (hitObstacle || hitBoundary) {
+          data.operatorState = 'stunned';
+          data.operatorPhaseTimer = 2;
+          showGameNotification('O Operário bateu e ficou atordoado!', 'info');
+        }
+      } else if (data.type !== 'jumper' || !data.jumping) {
         resolveStaticCollisions(nextEnemyPosition, data.type === 'tank' ? 1.15 : 0.8);
       }
       enemy.position.copy(nextEnemyPosition);
+      if (data.type === 'jumper' && data.jumping && enemy.position.distanceTo(player.position) < 2.4) {
+        beginJumperGrapple(enemy);
+      }
     }
 
     if (enemy.userData.healthGroup) {
@@ -5434,15 +5766,32 @@ function updateEnemies(delta) {
     if (data.type !== 'jumper' && !data.entityHidden && enemy.position.distanceTo(player.position) < (data.type === 'entity' ? 2.7 : 1.9)) {
       data.hitCooldown = (data.hitCooldown || 0) - delta;
       if (data.hitCooldown === undefined || data.hitCooldown <= 0) {
-        const baseDamage = bossEnemyTypes.has(data.type)
-          ? data.type === 'electrician' ? 1 : 2
-          : 1;
+        const chargingOperator = data.type === 'operator' && data.operatorState === 'charging';
+        const baseDamage = data.type === 'tank' ? 3
+          : chargingOperator ? 4
+            : bossEnemyTypes.has(data.type) ? (data.type === 'electrician' ? 1 : 2)
+              : 1;
         damagePlayer(baseDamage * (data.bossDamageMultiplier || 1));
+        if (chargingOperator) {
+          playerStunTimer = Math.max(playerStunTimer, 0.45);
+          data.operatorState = 'stunned';
+          data.operatorPhaseTimer = 2;
+          showGameNotification('Impacto da investida! Você foi empurrado.', 'damage');
+        }
         if (data.type === 'boss') playOneShot(localGameSounds.bruteAttack, 0.85);
         data.hitCooldown = 1.0;
         // empurra o zumbi um pouco pra trás em vez de matá-lo no toque
-        const knockback = new THREE.Vector3().subVectors(enemy.position, player.position).setY(0).normalize();
-        enemy.position.addScaledVector(knockback, 1.6);
+        const knockback = new THREE.Vector3().subVectors(enemy.position, player.position).setY(0);
+        if (knockback.lengthSq() < 0.001 && chargingOperator) {
+          knockback.copy(data.operatorDirection).negate();
+        }
+        knockback.normalize();
+        if (chargingOperator) {
+          player.position.addScaledVector(knockback, 3.8);
+          resolveStaticCollisions(player.position, 0.72);
+        } else {
+          enemy.position.addScaledVector(knockback, 1.6);
+        }
       }
     }
 
@@ -5468,7 +5817,9 @@ function updateEnemies(delta) {
         data.spriteBaseScale.y * (1 - step * 0.018),
         data.spriteBaseScale.z
       );
-      data.sprite.material.rotation = moved ? stride * (heavy ? 0.018 : 0.035) : stride * 0.008;
+      data.sprite.material.rotation = data.type === 'operator' && data.operatorState === 'windup'
+        ? -0.12
+        : moved ? stride * (heavy ? 0.018 : 0.035) : stride * 0.008;
     }
     if (data.jumpShadow) {
       data.jumpShadow.position.y = -data.jumpHeight + 0.025;
@@ -5553,6 +5904,87 @@ function showHealEffect() {
   healVignetteElement.classList.add('active');
 }
 
+function updateJumperGrappleProgress() {
+  if (jumperGrappleProgressElement && playerGrapple) {
+    jumperGrappleProgressElement.style.width = `${Math.min(100, playerGrapple.inputs / JUMPER_STRUGGLE_INPUTS * 100)}%`;
+  }
+}
+
+function finishJumperGrapple(escaped) {
+  if (!playerGrapple) return;
+  const { enemy } = playerGrapple;
+  playerGrapple = null;
+  document.body.classList.remove('jumper-grapple');
+  if (jumperGrappleProgressElement) jumperGrappleProgressElement.style.width = '0%';
+  if (enemy?.userData) {
+    const data = enemy.userData;
+    data.grappling = false;
+    data.jumping = false;
+    data.jumpHeight = 0;
+    data.jumpVelocity = 0;
+    data.jumpCooldownTimer = Math.max(data.jumpCooldownTimer || 0, 3.5);
+    data.hitCooldown = Math.max(data.hitCooldown || 0, 1.2);
+    const knockback = new THREE.Vector3().subVectors(enemy.position, player.position).setY(0);
+    if (knockback.lengthSq() < 0.01) knockback.set(0, 0, 1);
+    enemy.position.addScaledVector(knockback.normalize(), 2.4);
+    resolveStaticCollisions(enemy.position, 0.8);
+  }
+  if (escaped) {
+    showGameNotification('Você se soltou do Pulador!', 'reward');
+  } else {
+    damagePlayer(2);
+    showGameNotification('O Pulador te feriu antes de escapar!', 'damage');
+  }
+}
+
+function registerJumperStruggleInput(direction) {
+  if (!playerGrapple || direction === 0 || direction === playerGrapple.lastDirection) return;
+  playerGrapple.lastDirection = direction;
+  playerGrapple.inputs++;
+  playerGrapple.idleTimer = 0;
+  updateJumperGrappleProgress();
+  if (playerGrapple.inputs >= JUMPER_STRUGGLE_INPUTS) finishJumperGrapple(true);
+}
+
+function beginJumperGrapple(enemy) {
+  if (playerGrapple || gameOver || paused) return;
+  playerHorizontalVelocity.set(0, 0, 0);
+  playerGrapple = {
+    enemy,
+    inputs: 0,
+    lastDirection: 0,
+    idleTimer: 0,
+    remaining: JUMPER_GRAPPLE_TIMEOUT
+  };
+  enemy.userData.grappling = true;
+  enemy.userData.jumping = false;
+  enemy.userData.jumpHeight = 0;
+  enemy.userData.jumpVelocity = 0;
+  document.body.classList.add('jumper-grapple');
+  if (jumperGrappleInstructionElement) {
+    jumperGrappleInstructionElement.textContent = isTouchDevice
+      ? 'Mova o analógico para a esquerda e para a direita!'
+      : 'Alterne rapidamente entre as teclas A e D!';
+  }
+  updateJumperGrappleProgress();
+  damagePlayer(1);
+}
+
+function updateJumperGrapple(delta) {
+  if (!playerGrapple) return;
+  playerGrapple.remaining -= delta;
+  playerGrapple.idleTimer += delta;
+  if (playerGrapple.idleTimer > 1) {
+    playerGrapple.inputs = 0;
+    updateJumperGrappleProgress();
+  }
+  if (isTouchDevice) {
+    const horizontalInput = Math.abs(touchMoveVector.x) > 0.55 ? Math.sign(touchMoveVector.x) : 0;
+    if (horizontalInput) registerJumperStruggleInput(horizontalInput);
+  }
+  if (playerGrapple && playerGrapple.remaining <= 0) finishJumperGrapple(false);
+}
+
 function damagePlayer(amount) {
   const oldHealth = playerHealth;
   playerHealth = Math.max(0, playerHealth - amount);
@@ -5567,6 +5999,10 @@ function damagePlayer(amount) {
 function endGame() {
   gameOver = true;
   controlsEnabled = false;
+  if (playerGrapple?.enemy?.userData) playerGrapple.enemy.userData.grappling = false;
+  playerGrapple = null;
+  document.body.classList.remove('jumper-grapple');
+  if (jumperGrappleProgressElement) jumperGrappleProgressElement.style.width = '0%';
   document.exitPointerLock?.();
   stopAudio(matchMusic);
   playOneShot(youDiedSound, 1);
@@ -5579,39 +6015,71 @@ function endGame() {
 }
 
 function jumpPlayer() {
-  if (!playerGrounded || playerStunTimer > 0 || !gameStarted || paused || gameOver) return;
+  if (!playerGrounded || playerStunTimer > 0 || playerGrapple || !gameStarted || paused || gameOver) return;
   playerVerticalVelocity = playerJumpStrength;
   playerGrounded = false;
 }
 
 /* ---------- Movimento ---------- */
 function updatePlayer(delta) {
+  updateJumperGrapple(delta);
   const stunned = playerStunTimer > 0;
   playerStunTimer = Math.max(0, playerStunTimer - delta);
-  const keyboardMoving = !stunned && (keys.w || keys.a || keys.s || keys.d);
-  const touchMoving = !stunned && (Math.abs(touchMoveVector.x) > 0.01 || Math.abs(touchMoveVector.z) > 0.01);
+  const canMove = !stunned && !playerGrapple;
+  const keyboardMoving = canMove && (keys.w || keys.a || keys.s || keys.d);
+  const rawTouchMagnitude = Math.min(1, Math.hypot(touchMoveVector.x, touchMoveVector.z));
+  const touchMagnitude = rawTouchMagnitude > 0.12 ? (rawTouchMagnitude - 0.12) / 0.88 : 0;
+  const touchMoving = canMove && touchMagnitude > 0;
   isSprinting = (keys.shift || touchSprintHeld) && (keyboardMoving || touchMoving) && !isReloading;
   const sprintMultiplier = isSprinting ? 1.7 : 1;
-  const speed = 12 * delta * moveSpeedMultiplier * sprintMultiplier;
+  const maxSpeed = 12 * moveSpeedMultiplier * sprintMultiplier;
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion).setY(0).normalize();
   const right = new THREE.Vector3(1, 0, 0).applyQuaternion(player.quaternion).setY(0).normalize();
   const movement = new THREE.Vector3();
 
-  if (!stunned && keys.w) movement.add(forward);
-  if (!stunned && keys.s) movement.add(forward.clone().negate());
-  if (!stunned && keys.a) movement.add(right.clone().negate());
-  if (!stunned && keys.d) movement.add(right);
+  if (canMove && keys.w) movement.add(forward);
+  if (canMove && keys.s) movement.add(forward.clone().negate());
+  if (canMove && keys.a) movement.add(right.clone().negate());
+  if (canMove && keys.d) movement.add(right);
 
   if (touchMoving) {
-    movement.add(forward.clone().multiplyScalar(-touchMoveVector.z));
-    movement.add(right.clone().multiplyScalar(touchMoveVector.x));
+    const touchScale = touchMagnitude / rawTouchMagnitude;
+    movement.add(forward.clone().multiplyScalar(-touchMoveVector.z * touchScale));
+    movement.add(right.clone().multiplyScalar(touchMoveVector.x * touchScale));
   }
 
-  if (movement.lengthSq() > 0) {
-    movement.normalize().multiplyScalar(speed);
-    const nextPlayerPosition = player.position.clone().add(movement);
+  const hasMoveInput = movement.lengthSq() > 0;
+  if (hasMoveInput) {
+    movement.normalize().multiplyScalar(maxSpeed);
+  }
+  if (!canMove) {
+    playerHorizontalVelocity.set(0, 0, 0);
+  } else {
+    const velocityChange = movement.sub(playerHorizontalVelocity);
+    const maxVelocityChange = (hasMoveInput ? PLAYER_MOVE_ACCELERATION : PLAYER_MOVE_DECELERATION) * Math.min(delta, 0.05);
+    if (velocityChange.length() > maxVelocityChange) velocityChange.setLength(maxVelocityChange);
+    playerHorizontalVelocity.add(velocityChange);
+  }
+
+  if (playerHorizontalVelocity.lengthSq() > 0.0001) {
+    const movementStep = Math.min(delta, 0.05);
+    const nextPlayerPosition = player.position.clone();
+    nextPlayerPosition.x += playerHorizontalVelocity.x * movementStep;
+    const attemptedX = nextPlayerPosition.x;
     resolveStaticCollisions(nextPlayerPosition, 0.72);
+    if (Math.abs(nextPlayerPosition.x - attemptedX) > 0.02) playerHorizontalVelocity.x = 0;
     player.position.copy(nextPlayerPosition);
+
+    nextPlayerPosition.copy(player.position);
+    nextPlayerPosition.z += playerHorizontalVelocity.z * movementStep;
+    const attemptedZ = nextPlayerPosition.z;
+    resolveStaticCollisions(nextPlayerPosition, 0.72);
+    if (Math.abs(nextPlayerPosition.z - attemptedZ) > 0.02) playerHorizontalVelocity.z = 0;
+    player.position.copy(nextPlayerPosition);
+
+    const boundary = 158;
+    if (player.position.x <= -boundary || player.position.x >= boundary) playerHorizontalVelocity.x = 0;
+    if (player.position.z <= -boundary || player.position.z >= boundary) playerHorizontalVelocity.z = 0;
   }
 
   // Física simples do pulo.
@@ -5768,12 +6236,23 @@ function resetGame() {
   score = 0;
   scrap = 20;
   gameOver = false;
+  playerHorizontalVelocity.set(0, 0, 0);
+  yaw = targetYaw = 0;
+  pitch = targetPitch = 0;
+  player.rotation.y = yaw;
+  camera.rotation.x = pitch;
+  playerGrapple = null;
+  document.body.classList.remove('jumper-grapple');
+  if (jumperGrappleProgressElement) jumperGrappleProgressElement.style.width = '0%';
   itemSpawnTimer = 0;
   nextItemAt = 42;
   mimicGreatswordDropped = false;
   vestLevel = 0;
   reloadPerkLevel = 0;
   lifestealLevel = 0;
+  damagePerkLevel = 0;
+  speedPerkLevel = 0;
+  scavengerPerkLevel = 0;
   reloadDuration = 1.6;
   maxPlayerHealth = STARTING_PLAYER_HEALTH;
   playerHealth = maxPlayerHealth;
@@ -5836,7 +6315,7 @@ function resetGame() {
   bossThisWave = false;
   bossSpawned = false;
 
-  bullets.forEach((b) => scene.remove(b));
+  while (bullets.length) removeBulletAt(bullets.length - 1);
   grenadeProjectiles.forEach((grenade) => {
     scene.remove(grenade);
     grenade.geometry.dispose();
@@ -6029,15 +6508,27 @@ document.addEventListener('pointerlockchange', () => {
 
 renderer.domElement.addEventListener('mousemove', (event) => {
   if (!controlsEnabled || gameOver || paused) return;
-  yaw -= event.movementX * pointerSensitivity;
-  pitch -= event.movementY * pointerSensitivity;
-  pitch = THREE.MathUtils.clamp(pitch, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1);
+  targetYaw -= event.movementX * pointerSensitivity;
+  targetPitch -= event.movementY * pointerSensitivity;
+  targetPitch = THREE.MathUtils.clamp(targetPitch, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1);
+});
+
+function updateCameraLook(delta) {
+  const smoothing = 1 - Math.exp(-delta / CAMERA_LOOK_SMOOTHING);
+  const yawDifference = Math.atan2(Math.sin(targetYaw - yaw), Math.cos(targetYaw - yaw));
+  yaw += yawDifference * smoothing;
+  pitch += (targetPitch - pitch) * smoothing;
   player.rotation.y = yaw;
   camera.rotation.x = pitch;
-});
+}
 
 window.addEventListener('keydown', (event) => {
   if (event.code === 'Space') event.preventDefault();
+  if (playerGrapple && (event.code === 'KeyA' || event.code === 'KeyD')) {
+    event.preventDefault();
+    if (!event.repeat) registerJumperStruggleInput(event.code === 'KeyA' ? -1 : 1);
+    return;
+  }
   if (event.code === 'KeyW') keys.w = true;
   if (event.code === 'KeyA') keys.a = true;
   if (event.code === 'KeyS') keys.s = true;
@@ -6123,6 +6614,11 @@ window.addEventListener('pointerup', (event) => {
 renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
 window.addEventListener('blur', () => {
   mouseHeld = false;
+  keys.w = keys.a = keys.s = keys.d = keys.shift = false;
+  touchMoveVector.x = 0;
+  touchMoveVector.z = 0;
+  touchSprintHeld = false;
+  playerHorizontalVelocity.set(0, 0, 0);
   aiming = false;
   document.body.classList.remove('aiming');
   camera.fov = normalFov;
@@ -6214,11 +6710,9 @@ if (isTouchDevice) {
       const dy = touch.clientY - lastLookY;
       lastLookX = touch.clientX;
       lastLookY = touch.clientY;
-      yaw -= dx * touchLookSensitivity * (pointerSensitivity / 0.0024);
-      pitch -= dy * touchLookSensitivity * (pointerSensitivity / 0.0024);
-      pitch = THREE.MathUtils.clamp(pitch, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1);
-      player.rotation.y = yaw;
-      camera.rotation.x = pitch;
+      targetYaw -= dx * touchLookSensitivity * (pointerSensitivity / 0.0024);
+      targetPitch -= dy * touchLookSensitivity * (pointerSensitivity / 0.0024);
+      targetPitch = THREE.MathUtils.clamp(targetPitch, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1);
       e.preventDefault();
     }
   }, { passive: false });
@@ -6322,11 +6816,17 @@ function updateMuzzleFlashes(delta) {
     flash.life -= delta;
     const ratio = Math.max(0, flash.life / flash.maxLife);
     flash.light.intensity = 3.2 * ratio;
-    flash.sprite.material.opacity = 0.95 * ratio;
-    flash.sprite.scale.setScalar(0.55 * (1 + (1 - ratio) * 0.8));
+    if (flash.sprite) {
+      flash.sprite.material.opacity = 0.95 * ratio;
+      const scale = 1 + (1 - ratio) * 0.8;
+      flash.sprite.scale.set(0.48 * scale, 0.31 * scale, 1);
+    }
     if (flash.life <= 0) {
-      camera.remove(flash.light);
-      camera.remove(flash.sprite);
+      scene.remove(flash.light);
+      if (flash.sprite) {
+        scene.remove(flash.sprite);
+        flash.sprite.material.dispose();
+      }
       muzzleFlashes.splice(i, 1);
     }
   }
@@ -6377,8 +6877,8 @@ function spawnScientist() {
   scientistNpc = new THREE.Group();
   const material = new THREE.SpriteMaterial({ map: soldierTexture, color: soldierTexture ? 0xffffff : 0x8fef4d, transparent: true, depthWrite: false });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(3.0, 4.0, 1);
-  sprite.position.y = 2;
+  sprite.scale.set(4.8, 4.8, 1);
+  sprite.position.y = 2.25;
   scientistNpc.add(sprite);
   scientistNpc.position.set(-17.5, -1.5, 22);
   scene.add(scientistNpc);
@@ -6708,6 +7208,7 @@ function castGreatswordWave() {
 function animate() {
   refreshNpcUI();
   const delta = Math.min(clock.getDelta(), 0.1);
+  updateCameraLook(delta);
   updateAmbientFireflyPoints(clock.elapsedTime);
   updateAmbience(clock.elapsedTime, delta);
   updateCampfireSparks(clock.elapsedTime, delta);
@@ -6758,7 +7259,11 @@ function animate() {
     updateTimedItems(delta);
     const nearbyChest = getNearbyChest();
     document.getElementById('forest-chest-prompt')?.classList.toggle('visible', Boolean(nearbyChest));
-    drawForestMinimap();
+    minimapRefreshTimer += delta;
+    if (minimapRefreshTimer >= 0.12) {
+      minimapRefreshTimer = 0;
+      drawForestMinimap();
+    }
     updateMuzzleFlashes(delta);
     updateEnemyProjectiles(delta);
     updateAcidPuddles(delta);
